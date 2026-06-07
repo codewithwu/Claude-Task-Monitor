@@ -27,11 +27,17 @@ function transition(prev: SessionState, next: Partial<SessionState> & { status: 
 export function reduce(prev: SessionState | null, event: HookPayload): ReduceResult {
   const ts = event.ts
   const cwd = event.cwd ?? prev?.cwd ?? '<unknown>'
-  const base = prev ?? init(event.session_id, cwd, ts)
+  // 任何带 pid 的事件都更新 session 的 pid(不限于 SessionStart)
+  // 第一次收到事件时 init 一次;有 prev 时把 event.pid 合并进去
+  const base: SessionState = prev
+    ? (event.pid !== undefined && event.pid !== prev.pid
+        ? { ...prev, pid: event.pid }
+        : prev)
+    : init(event.session_id, cwd, ts, event.pid)
 
   switch (event.hook_event_name) {
     case 'SessionStart':
-      return { kind: 'updated', state: { ...init(event.session_id, cwd, ts, event.pid), fileOffset: base.fileOffset } }
+      return { kind: 'updated', state: { ...init(event.session_id, cwd, ts, event.pid), fileOffset: base.fileOffset, pid: event.pid ?? base.pid } }
 
     case 'SessionEnd':
       return { kind: 'removed' }

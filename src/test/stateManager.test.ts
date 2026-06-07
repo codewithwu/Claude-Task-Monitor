@@ -166,6 +166,30 @@ describe('reduce', () => {
     if (r.kind !== 'updated') throw new Error()
     expect(r.state.pid).toBeUndefined()
   })
+
+  it('SessionStart 漏发时,后续带 pid 的事件也能补上 pid', () => {
+    const r = reduce(null, evt({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'a',
+      cwd: '/p',
+      user_prompt: 'hi',
+      pid: 99999
+    }))
+    if (r.kind !== 'updated') throw new Error()
+    expect(r.state.pid).toBe(99999)
+  })
+
+  it('后续事件的 pid 覆盖之前记录的值', () => {
+    let s: SessionState = (reduce(null, evt({ hook_event_name: 'SessionStart', session_id: 'a', cwd: '/p', pid: 100 })) as any).state
+    s = (reduce(s, evt({ hook_event_name: 'UserPromptSubmit', session_id: 'a', user_prompt: 'p', pid: 200 })) as any).state
+    expect(s.pid).toBe(200)
+  })
+
+  it('事件没带 pid 时,state.pid 保留之前的值', () => {
+    let s: SessionState = (reduce(null, evt({ hook_event_name: 'SessionStart', session_id: 'a', cwd: '/p', pid: 100 })) as any).state
+    s = (reduce(s, evt({ hook_event_name: 'Stop', session_id: 'a' })) as any).state
+    expect(s.pid).toBe(100)
+  })
 })
 
 import { SessionStore } from '../stateManager'
