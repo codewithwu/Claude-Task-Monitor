@@ -1,0 +1,35 @@
+{
+  "name": "claude-task-monitor",
+  "displayName": "Claude Task Monitor",
+  "description": "Real-time dashboard for local Claude Code CLI sessions",
+  "version": "0.1.0",
+  "publisher": "codewithwu",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {},
+  "scripts": {
+    "build": "tsup",
+    "watch": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "node ./dist-test/integration/runTest.js",
+    "package": "vsce package",
+    "vscode:prepublish": "pnpm build"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@types/mocha": "^10.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "mocha": "^10.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "vsce": "^2.15.0"
+  }
+}
