@@ -49,7 +49,7 @@ export class SessionsWatcher extends EventEmitter<WatcherEvents> {
 
   private handleAdd(file: string): void {
     if (!file.endsWith('.jsonl')) return
-    this.offsets.set(file, 0)
+    if (!this.offsets.has(file)) this.offsets.set(file, 0)
     this.emit('fileAdded', file)
     this.readNew(file)
   }

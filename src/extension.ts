@@ -85,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   })
   watcher.on('fileRemoved', (file) => {
     const sessionId = path.basename(file, '.jsonl')
-    store.apply({ hook_event_name: 'SessionEnd', session_id: sessionId, ts: Date.now() / 1000 } as HookPayload)
+    store.apply({ hook_event_name: 'SessionEnd', session_id: sessionId, ts: Math.floor(Date.now() / 1000) } as HookPayload)
   })
   watcher.on('parseError', (msg, file, line) => {
     console.warn(`[claude-task-monitor] parse error in ${file}: ${msg}`)
