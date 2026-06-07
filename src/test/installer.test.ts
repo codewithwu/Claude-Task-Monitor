@@ -49,7 +49,7 @@ describe('mergeSettings', () => {
       const entries = result.hooks![ev]
       const ours = entries.find((e: any) => e._owner === OWNER_TAG)
       expect(ours).toBeDefined()
-      expect(ours.hooks[0].command).toBe(ourHookCmd)
+      expect(ours!.hooks[0].command).toBe(ourHookCmd)
     }
   })
 
