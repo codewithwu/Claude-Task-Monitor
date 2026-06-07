@@ -150,3 +150,54 @@ describe('reduce', () => {
     expect(r.state).toEqual(s)
   })
 })
+
+import { SessionStore } from '../stateManager'
+
+describe('SessionStore', () => {
+  it('apply SessionStart 后能 list 出该 session', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    const list = store.list()
+    expect(list).toHaveLength(1)
+    expect(list[0].sessionId).toBe('s1')
+  })
+
+  it('apply SessionEnd 后 session 被移除', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    store.apply({ hook_event_name: 'SessionEnd', session_id: 's1', ts: 2 } as any)
+    expect(store.list()).toHaveLength(0)
+  })
+
+  it('list 按 waiting > running > idle 优先级排序，同色按 stateChangedAt 倒序', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'idle-old', cwd: '/a', ts: 100 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'running', cwd: '/b', ts: 200 } as any)
+    store.apply({ hook_event_name: 'UserPromptSubmit', session_id: 'running', user_prompt: 'p', ts: 250 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'waiting', cwd: '/c', ts: 300 } as any)
+    store.apply({ hook_event_name: 'Notification', session_id: 'waiting', notification_type: 'permission_prompt', ts: 350 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'idle-new', cwd: '/d', ts: 400 } as any)
+    const ids = store.list().map(s => s.sessionId)
+    expect(ids).toEqual(['waiting', 'running', 'idle-new', 'idle-old'])
+  })
+
+  it('updateFileOffset 持久化游标', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    store.updateFileOffset('s1', 512)
+    expect(store.get('s1')?.fileOffset).toBe(512)
+  })
+
+  it('onChange 回调在 apply 后触发', () => {
+    const store = new SessionStore()
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    expect(count).toBe(1)
+  })
+
+  it('对未知 session 的 SessionEnd 不抛错', () => {
+    const store = new SessionStore()
+    expect(() => store.apply({ hook_event_name: 'SessionEnd', session_id: 'nope', ts: 1 } as any)).not.toThrow()
+  })
+})

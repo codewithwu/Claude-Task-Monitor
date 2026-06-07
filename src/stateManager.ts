@@ -61,3 +61,50 @@ export function reduce(prev: SessionState | null, event: HookPayload): ReduceRes
       return { kind: 'updated', state: base }
   }
 }
+
+const STATUS_PRIORITY: Record<SessionStatus, number> = {
+  waiting: 0,
+  running: 1,
+  idle: 2
+}
+
+export class SessionStore {
+  private sessions = new Map<string, SessionState>()
+  private listeners: Array<() => void> = []
+
+  apply(event: HookPayload): void {
+    const prev = this.sessions.get(event.session_id) ?? null
+    const result = reduce(prev, event)
+    if (result.kind === 'removed') {
+      this.sessions.delete(event.session_id)
+    } else {
+      this.sessions.set(event.session_id, result.state)
+    }
+    this.emit()
+  }
+
+  get(sessionId: string): SessionState | undefined {
+    return this.sessions.get(sessionId)
+  }
+
+  list(): SessionState[] {
+    return [...this.sessions.values()].sort((a, b) => {
+      const p = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]
+      if (p !== 0) return p
+      return b.stateChangedAt - a.stateChangedAt
+    })
+  }
+
+  updateFileOffset(sessionId: string, offset: number): void {
+    const s = this.sessions.get(sessionId)
+    if (s) this.sessions.set(sessionId, { ...s, fileOffset: offset })
+  }
+
+  onChange(fn: () => void): void {
+    this.listeners.push(fn)
+  }
+
+  private emit(): void {
+    for (const fn of this.listeners) fn()
+  }
+}
