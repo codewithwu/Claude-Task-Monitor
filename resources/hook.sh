@@ -8,7 +8,11 @@ event=$(echo "$payload" | jq -r '.hook_event_name // empty')
 [ -z "$session_id" ] && exit 0
 [ -z "$event" ] && exit 0
 
-echo "$payload" | jq -c '. + {ts: now}' >> "$dir/$session_id.jsonl"
+if [ "$event" = "SessionStart" ]; then
+  echo "$payload" | jq -c --argjson pid "$PPID" '. + {ts: now, pid: $pid}' >> "$dir/$session_id.jsonl"
+else
+  echo "$payload" | jq -c '. + {ts: now}' >> "$dir/$session_id.jsonl"
+fi
 
 if [ "$event" = "SessionEnd" ]; then
   mkdir -p "$dir/.ended"

@@ -18,6 +18,7 @@ export interface HookPayload {
   tool_name?: string                // Pre/PostToolUse
   tool_input?: unknown              // PreToolUse
   notification_type?: string        // Notification
+  pid?: number                      // SessionStart: 注入的 $PPID,用于活性检测
 }
 
 export type SessionStatus = 'idle' | 'running' | 'waiting'
@@ -30,6 +31,7 @@ export interface SessionState {
   lastUserPrompt: string            // 截断到 60 字符
   currentTool: { name: string; input: unknown } | null
   fileOffset: number                // watcher 增量读取游标
+  pid?: number                      // CLI 进程 PID;通过 process.kill(pid, 0) 活性检测
 }
 
 export type ReduceResult =

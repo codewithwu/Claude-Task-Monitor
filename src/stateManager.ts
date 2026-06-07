@@ -2,7 +2,7 @@ import type { HookPayload, ReduceResult, SessionState, SessionStatus } from './t
 
 const MAX_PROMPT_LEN = 60
 
-function init(sessionId: string, cwd: string, ts: number): SessionState {
+function init(sessionId: string, cwd: string, ts: number, pid?: number): SessionState {
   return {
     sessionId,
     cwd,
@@ -10,7 +10,8 @@ function init(sessionId: string, cwd: string, ts: number): SessionState {
     stateChangedAt: ts,
     lastUserPrompt: '',
     currentTool: null,
-    fileOffset: 0
+    fileOffset: 0,
+    pid
   }
 }
 
@@ -30,7 +31,7 @@ export function reduce(prev: SessionState | null, event: HookPayload): ReduceRes
 
   switch (event.hook_event_name) {
     case 'SessionStart':
-      return { kind: 'updated', state: { ...init(event.session_id, cwd, ts), fileOffset: base.fileOffset } }
+      return { kind: 'updated', state: { ...init(event.session_id, cwd, ts, event.pid), fileOffset: base.fileOffset } }
 
     case 'SessionEnd':
       return { kind: 'removed' }
@@ -98,6 +99,17 @@ export class SessionStore {
   updateFileOffset(sessionId: string, offset: number): void {
     const s = this.sessions.get(sessionId)
     if (s) this.sessions.set(sessionId, { ...s, fileOffset: offset })
+  }
+
+  removeByPid(pid: number): string | undefined {
+    for (const [id, s] of this.sessions) {
+      if (s.pid !== undefined && s.pid === pid) {
+        this.sessions.delete(id)
+        this.emit()
+        return id
+      }
+    }
+    return undefined
   }
 
   onChange(fn: () => void): void {

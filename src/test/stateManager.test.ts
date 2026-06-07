@@ -149,6 +149,23 @@ describe('reduce', () => {
     if (r.kind !== 'updated') throw new Error()
     expect(r.state).toEqual(s)
   })
+
+  it('SessionStart 存储事件里的 pid', () => {
+    const r = reduce(null, evt({
+      hook_event_name: 'SessionStart',
+      session_id: 'a',
+      cwd: '/p',
+      pid: 12345
+    }))
+    if (r.kind !== 'updated') throw new Error()
+    expect(r.state.pid).toBe(12345)
+  })
+
+  it('SessionStart 没有 pid 字段时,state.pid 为 undefined', () => {
+    const r = reduce(null, evt({ hook_event_name: 'SessionStart', session_id: 'a', cwd: '/p' }))
+    if (r.kind !== 'updated') throw new Error()
+    expect(r.state.pid).toBeUndefined()
+  })
 })
 
 import { SessionStore } from '../stateManager'
@@ -199,5 +216,34 @@ describe('SessionStore', () => {
   it('对未知 session 的 SessionEnd 不抛错', () => {
     const store = new SessionStore()
     expect(() => store.apply({ hook_event_name: 'SessionEnd', session_id: 'nope', ts: 1 } as any)).not.toThrow()
+  })
+
+  it('removeByPid 移除 pid 匹配的 session,返回 sessionId,触发 onChange', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1, pid: 100 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's2', cwd: '/q', ts: 1, pid: 200 } as any)
+    let count = 0
+    store.onChange(() => { count++ })
+    const removed = store.removeByPid(100)
+    expect(removed).toBe('s1')
+    expect(store.list().map(s => s.sessionId)).toEqual(['s2'])
+    expect(count).toBe(1)
+  })
+
+  it('removeByPid 没匹配时返回 undefined,不触发 onChange', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1, pid: 100 } as any)
+    let count = 0
+    store.onChange(() => { count++ })
+    const removed = store.removeByPid(999)
+    expect(removed).toBeUndefined()
+    expect(count).toBe(0)
+  })
+
+  it('removeByPid 只匹配 pid 字段存在的 session', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'no-pid', cwd: '/p', ts: 1 } as any)
+    expect(store.removeByPid(undefined as any)).toBeUndefined()
+    expect(store.list()).toHaveLength(1)
   })
 })

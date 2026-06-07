@@ -51,6 +51,11 @@
           "type": "number",
           "default": 1000,
           "description": "侧边栏持续时间显示的刷新间隔 (毫秒)"
+        },
+        "claudeTaskMonitor.livenessCheckIntervalMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "进程活性检测间隔 (毫秒);用于把 Ctrl+Z / 异常退出的 CLI 从侧边栏移除"
         }
       }
     }

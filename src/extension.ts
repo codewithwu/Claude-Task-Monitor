@@ -27,6 +27,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const staleHours = cfg.get<number>('staleHours', 24)
   const dedupeSeconds = cfg.get<number>('notifyDedupeSeconds', 30)
   const refreshMs = cfg.get<number>('refreshIntervalMs', 1000)
+  const livenessMs = cfg.get<number>('livenessCheckIntervalMs', 5000)
 
   fs.mkdirSync(SESSIONS_DIR, { recursive: true })
   fs.mkdirSync(ENDED_DIR, { recursive: true })
@@ -104,10 +105,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showCollapseAll: false
   })
   const tick = setInterval(() => provider.refresh(), refreshMs)
+  const livenessTick = setInterval(() => pruneDeadSessions(store), livenessMs)
 
   context.subscriptions.push(
     treeView,
     { dispose: () => clearInterval(tick) },
+    { dispose: () => clearInterval(livenessTick) },
     { dispose: () => void watcher.close() }
   )
 }
@@ -164,6 +167,20 @@ function bootstrapExistingFiles(sessionsDir: string, watcher: SessionsWatcher, s
       watcher.setOffset(full, Buffer.byteLength(content, 'utf8'))
     } catch {
       // 跳过
+    }
+  }
+}
+
+function pruneDeadSessions(store: SessionStore): void {
+  for (const s of store.list()) {
+    if (s.pid === undefined) continue
+    try {
+      process.kill(s.pid, 0)
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException
+      if (err.code === 'ESRCH') {
+        store.removeByPid(s.pid)
+      }
     }
   }
 }
