@@ -8,7 +8,53 @@
   "categories": ["Other"],
   "main": "./dist/extension.js",
   "activationEvents": ["onStartupFinished"],
-  "contributes": {},
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudeTaskMonitor",
+          "title": "Claude Task Monitor",
+          "icon": "$(pulse)"
+        }
+      ]
+    },
+    "views": {
+      "claudeTaskMonitor": [
+        {
+          "id": "claudeTaskMonitor.sessionsView",
+          "name": "Sessions",
+          "icon": "$(pulse)",
+          "contextualTitle": "Claude Task Monitor"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "claudeTaskMonitor.sessionsView",
+        "contents": "当前无活跃 Claude Code 会话。\n启动 `claude` 后会自动出现。"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Task Monitor",
+      "properties": {
+        "claudeTaskMonitor.staleHours": {
+          "type": "number",
+          "default": 24,
+          "description": "会话文件 mtime 超过该小时数视为僵尸, 启动时自动归档到 .ended/"
+        },
+        "claudeTaskMonitor.notifyDedupeSeconds": {
+          "type": "number",
+          "default": 30,
+          "description": "同一 session 在该秒数内不重复弹等待权限通知"
+        },
+        "claudeTaskMonitor.refreshIntervalMs": {
+          "type": "number",
+          "default": 1000,
+          "description": "侧边栏持续时间显示的刷新间隔 (毫秒)"
+        }
+      }
+    }
+  },
   "scripts": {
     "build": "tsup",
     "watch": "tsup --watch",
