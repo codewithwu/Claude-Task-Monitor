@@ -128,7 +128,17 @@ docs/**
 }
 ```
 
-- [ ] **Step 4: 创建 `tsconfig.json`**
+- [ ] **Step 4: 创建 `pnpm-workspace.yaml` 允许 esbuild / keytar 跑 install 脚本**
+
+> pnpm 11 不再读取 `package.json` 的 `pnpm` 字段，统一改在 `pnpm-workspace.yaml` 里配置（关键名是 `allowBuilds`）。即使单包仓库也需要这个文件来放 pnpm 设置。
+
+```yaml
+allowBuilds:
+  esbuild: true
+  keytar: true
+```
+
+- [ ] **Step 5: 创建 `tsconfig.json`**
 
 ```json
 {
@@ -151,7 +161,7 @@ docs/**
 }
 ```
 
-- [ ] **Step 5: 创建 `tsup.config.ts`**
+- [ ] **Step 6: 创建 `tsup.config.ts`**
 
 ```ts
 import { defineConfig } from 'tsup'
@@ -167,7 +177,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 6: 创建 `vitest.config.ts`**
+- [ ] **Step 7: 创建 `vitest.config.ts`**
 
 ```ts
 import { defineConfig } from 'vitest/config'
@@ -181,7 +191,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 7: 创建 `src/extension.ts` 占位**
+- [ ] **Step 8: 创建 `src/extension.ts` 占位**
 
 ```ts
 import * as vscode from 'vscode'
@@ -195,7 +205,7 @@ export function deactivate(): void {
 }
 ```
 
-- [ ] **Step 8: 安装依赖并验证构建**
+- [ ] **Step 9: 安装依赖并验证构建**
 
 Run:
 ```
@@ -204,10 +214,10 @@ pnpm build
 ```
 Expected: `dist/extension.js` 存在，无报错。
 
-- [ ] **Step 9: 提交**
+- [ ] **Step 10: 提交**
 
 ```bash
-git add package.json tsconfig.json tsup.config.ts vitest.config.ts .gitignore .vscodeignore src/extension.ts pnpm-lock.yaml
+git add package.json tsconfig.json tsup.config.ts vitest.config.ts .gitignore .vscodeignore src/extension.ts pnpm-workspace.yaml pnpm-lock.yaml
 git commit -m "chore: scaffold VS Code extension project"
 ```
 
