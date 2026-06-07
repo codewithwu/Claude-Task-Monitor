@@ -6,6 +6,7 @@ import { SessionsWatcher } from './watcher'
 import { SessionStore } from './stateManager'
 import { SessionTreeDataProvider } from './treeDataProvider'
 import { Notifier } from './notifier'
+import { pruneDeadSessions } from './liveness'
 import {
   writeHookScript,
   mergeSettings,
@@ -105,7 +106,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showCollapseAll: false
   })
   const tick = setInterval(() => provider.refresh(), refreshMs)
-  const livenessTick = setInterval(() => pruneDeadSessions(store), livenessMs)
+  const livenessTick = setInterval(() => pruneDeadSessions(store, SESSIONS_DIR), livenessMs)
 
   context.subscriptions.push(
     treeView,
@@ -167,20 +168,6 @@ function bootstrapExistingFiles(sessionsDir: string, watcher: SessionsWatcher, s
       watcher.setOffset(full, Buffer.byteLength(content, 'utf8'))
     } catch {
       // 跳过
-    }
-  }
-}
-
-function pruneDeadSessions(store: SessionStore): void {
-  for (const s of store.list()) {
-    if (s.pid === undefined) continue
-    try {
-      process.kill(s.pid, 0)
-    } catch (e) {
-      const err = e as NodeJS.ErrnoException
-      if (err.code === 'ESRCH') {
-        store.removeByPid(s.pid)
-      }
     }
   }
 }
