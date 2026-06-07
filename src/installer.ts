@@ -60,3 +60,29 @@ export function mergeSettings(existing: Settings, command: string): Settings {
   }
   return result
 }
+
+import { spawn } from 'node:child_process'
+
+export function uninstallSettings(existing: Settings): Settings {
+  if (!existing.hooks) return existing
+  const newHooks: Record<string, HookEntry[]> = {}
+  for (const [event, entries] of Object.entries(existing.hooks)) {
+    const filtered = entries.filter(e => e._owner !== OWNER_TAG)
+    if (filtered.length > 0) newHooks[event] = filtered
+  }
+  const result: Settings = { ...existing }
+  if (Object.keys(newHooks).length === 0) {
+    delete result.hooks
+  } else {
+    result.hooks = newHooks
+  }
+  return result
+}
+
+export function detectJq(): Promise<boolean> {
+  return new Promise(resolve => {
+    const proc = spawn('jq', ['--version'])
+    proc.on('error', () => resolve(false))
+    proc.on('exit', code => resolve(code === 0))
+  })
+}

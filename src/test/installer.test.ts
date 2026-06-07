@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { writeHookScript, mergeSettings, OWNER_TAG } from '../installer'
+import { writeHookScript, mergeSettings, OWNER_TAG, uninstallSettings, detectJq } from '../installer'
 
 let tmpDir: string
 
@@ -94,5 +94,39 @@ describe('mergeSettings', () => {
     const result = mergeSettings({}, ourHookCmd)
     const ours = (result.hooks!.SessionStart as any[]).find(e => e._owner === OWNER_TAG)
     expect(ours.matcher).toBeUndefined()
+  })
+})
+
+describe('uninstallSettings', () => {
+  const ourHookCmd = '~/.claude-task-monitor/hook.sh'
+
+  it('移除我们的条目，保留用户条目', () => {
+    const merged = mergeSettings({
+      hooks: {
+        PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo user' }] }]
+      }
+    }, ourHookCmd)
+    const cleaned = uninstallSettings(merged)
+    expect(cleaned.hooks?.PreToolUse).toHaveLength(1)
+    expect(cleaned.hooks!.PreToolUse[0].hooks[0].command).toBe('echo user')
+  })
+
+  it('某事件清理后没有条目则删除该 key', () => {
+    const merged = mergeSettings({}, ourHookCmd)
+    const cleaned = uninstallSettings(merged)
+    expect(cleaned.hooks?.SessionStart).toBeUndefined()
+  })
+
+  it('hooks 全清空后删除 hooks 字段', () => {
+    const merged = mergeSettings({}, ourHookCmd)
+    const cleaned = uninstallSettings(merged)
+    expect(cleaned.hooks).toBeUndefined()
+  })
+})
+
+describe('detectJq', () => {
+  it('当前环境检测返回 boolean', async () => {
+    const result = await detectJq()
+    expect(typeof result).toBe('boolean')
   })
 })
