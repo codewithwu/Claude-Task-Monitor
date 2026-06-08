@@ -17,7 +17,33 @@ VS Code 扩展：在活动栏侧边栏实时监控本机所有 Claude Code CLI �
 
 ## 安装
 
-从源码：
+扩展已发布到 [Open VSX](https://open-vsx.org/extension/codewithwu-cn/claude-task-monitor)；
+[GitHub Releases](https://github.com/codewithwu/Claude-Task-Monitor/releases) 同步提供 `.vsix` 离线包。
+
+不同 IDE 使用不同的扩展市场，请按你使用的 IDE 选对应方式：
+
+### VSCodium / Code - OSS / Gitpod
+
+这些 IDE 默认使用 Open VSX。打开扩展面板，搜索 `claude-task-monitor`，点 Install 即可。
+
+### VS Code / Cursor / Windsurf
+
+这些 IDE 使用自家扩展市场，不直接连 Open VSX。安装步骤：
+
+1. 到 [Releases](https://github.com/codewithwu/Claude-Task-Monitor/releases) 下载最新的 `claude-task-monitor-X.Y.Z.vsix`
+2. 在 IDE 里打开命令面板（`Ctrl+Shift+P` / `Cmd+Shift+P`）
+3. 运行 **"Extensions: Install from VSIX"**，选中下载的 `.vsix` 文件
+
+或者在终端里：
+
+```bash
+# VS Code
+code --install-extension claude-task-monitor-0.1.0.vsix
+# Cursor
+cursor --install-extension claude-task-monitor-0.1.0.vsix
+```
+
+### 从源码构建（开发者）
 
 ```bash
 pnpm install
