@@ -7,6 +7,12 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-08
+
+### Fixed
+
+- 替换扩展图标：从空 PNG 改为基于 `sidebar.svg` 渲染的 428×428 dashboard 图标（5 根柱状图）
+
 ## [0.1.0] - 2026-06-08
 
 首个公开版本。提供 Claude Code CLI 会话的本地实时监控。
@@ -46,5 +52,6 @@
 - 端到端活性检测：起真实子进程，覆盖 `kill -9` / SIGSTOP / 正常退出三种路径
 - 单元测试：事件 reducer、SessionStore、installer、watcher 等核心模块
 
-[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.1
 [0.1.0]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.0
