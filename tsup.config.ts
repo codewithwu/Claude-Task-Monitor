@@ -5,6 +5,7 @@ export default defineConfig({
   outDir: 'dist',
   format: ['cjs'],
   external: ['vscode'],
+  noExternal: ['chokidar'],
   target: 'node18',
   sourcemap: true,
   clean: true

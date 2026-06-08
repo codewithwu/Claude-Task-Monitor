@@ -152,22 +152,28 @@ function archiveStaleFiles(sessionsDir: string, endedDir: string, staleHours: nu
 }
 
 function bootstrapExistingFiles(sessionsDir: string, watcher: SessionsWatcher, store: SessionStore): void {
-  for (const name of fs.readdirSync(sessionsDir)) {
-    if (!name.endsWith('.jsonl')) continue
+  const files = fs.readdirSync(sessionsDir).filter(n => n.endsWith('.jsonl'))
+  console.log(`[claude-task-monitor] bootstrap: found ${files.length} session files in ${sessionsDir}`)
+  for (const name of files) {
     const full = path.join(sessionsDir, name)
     try {
       const content = fs.readFileSync(full, 'utf8')
+      let linesProcessed = 0
       for (const line of content.split('\n')) {
         if (!line) continue
         try {
           store.apply(JSON.parse(line) as HookPayload)
-        } catch {
-          // 跳过损坏行
+          linesProcessed++
+        } catch (e) {
+          console.warn(`[claude-task-monitor] bootstrap parse error in ${full}: ${(e as Error).message}`)
         }
       }
       watcher.setOffset(full, Buffer.byteLength(content, 'utf8'))
-    } catch {
-      // 跳过
+      console.log(`[claude-task-monitor] bootstrap: ${name} → ${linesProcessed} events applied`)
+    } catch (e) {
+      console.warn(`[claude-task-monitor] bootstrap read error for ${full}: ${(e as Error).message}`)
     }
   }
+  const list = store.list()
+  console.log(`[claude-task-monitor] bootstrap done: store has ${list.length} sessions: ${list.map(s => `${s.sessionId.slice(0,8)}=${s.status}`).join(', ')}`)
 }

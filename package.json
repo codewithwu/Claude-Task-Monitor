@@ -3,9 +3,31 @@
   "displayName": "Claude Task Monitor",
   "description": "Real-time dashboard for local Claude Code CLI sessions",
   "version": "0.1.0",
-  "publisher": "codewithwu",
+  "publisher": "codewithwu-cn",
+  "license": "MIT",
+  "icon": "resources/icons/icon.png",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "productivity",
+    "monitor",
+    "dashboard",
+    "session"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codewithwu/Claude-Task-Monitor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/codewithwu/Claude-Task-Monitor/issues"
+  },
+  "homepage": "https://github.com/codewithwu/Claude-Task-Monitor#readme",
+  "galleryBanner": {
+    "color": "#0e639c"
+  },
   "main": "./dist/extension.js",
   "activationEvents": ["onStartupFinished"],
   "contributes": {
@@ -67,7 +89,7 @@
     "test:watch": "vitest",
     "build:integration": "tsc -p tsconfig.integration.json",
     "test:integration": "pnpm build && pnpm build:integration && node ./dist-test/runTest.js",
-    "package": "vsce package",
+    "package": "vsce package --no-dependencies",
     "vscode:prepublish": "pnpm build"
   },
   "dependencies": {
