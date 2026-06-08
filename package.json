@@ -14,7 +14,7 @@
         {
           "id": "claudeTaskMonitor",
           "title": "Claude Task Monitor",
-          "icon": "$(pulse)"
+          "icon": "resources/icons/sidebar.svg"
         }
       ]
     },
