@@ -1,0 +1,1768 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Task Monitor · 一份关于本地 AI 会话监控的工程实践</title>
+<meta name="description" content="Claude Task Monitor — VS Code 侧边栏里实时监控本机所有 Claude Code CLI 会话的执行状态。开源、MIT、跨 IDE。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=JetBrains+Mono:ital,wght@0,300..800;1,300..800&family=Noto+Serif+SC:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    --bg: #0e0d12;
+    --bg-elev: #15141a;
+    --bg-card: #1a1822;
+    --bg-line: #211f2a;
+    --fg: #e9e3d4;
+    --fg-mute: #9a9382;
+    --fg-faint: #5d5966;
+    --border: #25232c;
+    --border-strong: #34303d;
+
+    --amber: #e8b339;
+    --amber-soft: #4a3a18;
+    --green: #7eb87e;
+    --green-soft: #1f3a23;
+    --red: #d75d5d;
+    --red-soft: #3d1f1f;
+    --gold: #c89d5b;
+
+    --serif: "Fraunces", "Noto Serif SC", ui-serif, Georgia, serif;
+    --sans: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+    --max: 1320px;
+    --gutter: clamp(20px, 4vw, 56px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* Film grain over everything for editorial texture */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: .035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 0.4 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  ::selection { background: var(--gold); color: #1a1408; }
+
+  a { color: inherit; text-decoration: none; }
+  a:hover { color: var(--gold); }
+
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter); }
+
+  /* ---------- Reveal animation ---------- */
+  .reveal { opacity: 0; transform: translateY(20px); transition: opacity .9s ease, transform .9s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ---------- Top status bar ---------- */
+  .topbar {
+    border-bottom: 1px solid var(--border);
+    background: rgba(14, 13, 18, .85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px var(--gutter);
+    max-width: var(--max);
+    margin: 0 auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .04em;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg-elev);
+    color: var(--gold);
+  }
+  .brand-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg);
+    letter-spacing: .02em;
+  }
+  .brand-ver {
+    color: var(--fg-faint);
+    font-size: 11px;
+    margin-left: 4px;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 22px; }
+  .topbar-right a { color: var(--fg-mute); transition: color .2s; }
+  .topbar-right a:hover { color: var(--fg); }
+  .status-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 0 rgba(126, 184, 126, .6);
+    animation: pulse 2.4s ease-out infinite;
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(126, 184, 126, .55); }
+    70% { box-shadow: 0 0 0 9px rgba(126, 184, 126, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(126, 184, 126, 0); }
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    padding: clamp(70px, 12vw, 140px) 0 clamp(60px, 10vw, 110px);
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: clamp(50px, 8vw, 90px);
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+  .eyebrow .line { width: 32px; height: 1px; background: var(--fg-mute); opacity: .6; }
+  .eyebrow .dot { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; }
+
+  h1.hero-title {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(56px, 11vw, 168px);
+    line-height: .88;
+    letter-spacing: -.04em;
+    font-variation-settings: "opsz" 144, "SOFT" 50;
+    margin-bottom: 36px;
+  }
+  h1.hero-title em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--gold);
+    font-variation-settings: "opsz" 144, "SOFT" 100;
+  }
+  h1.hero-title .stop {
+    display: inline-block;
+    background: linear-gradient(180deg, transparent 65%, rgba(200, 157, 91, .25) 65%);
+  }
+
+  .hero-sub {
+    display: grid;
+    grid-template-columns: 1.1fr .9fr;
+    gap: clamp(30px, 5vw, 80px);
+    align-items: end;
+    margin-top: 8px;
+  }
+  .hero-lede {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(20px, 2.2vw, 28px);
+    line-height: 1.4;
+    color: var(--fg);
+    letter-spacing: -.01em;
+    font-variation-settings: "opsz" 36;
+  }
+  .hero-lede em {
+    color: var(--gold);
+    font-style: italic;
+  }
+  .hero-meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .meta-cell { border-top: 1px solid var(--border-strong); padding-top: 14px; }
+  .meta-cell .k { color: var(--fg-faint); letter-spacing: .12em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .meta-cell .v { color: var(--fg); font-size: 14px; font-weight: 500; }
+
+  /* The 3 status pills below the hero */
+  .status-trio {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 56px;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 10px 18px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--fg);
+    transition: transform .25s ease, background .25s ease;
+  }
+  .pill:hover { transform: translateY(-2px); }
+  .pill .pip {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .pill.idle .pip { background: var(--green); box-shadow: 0 0 12px rgba(126,184,126,.6); }
+  .pill.run .pip { background: var(--amber); box-shadow: 0 0 12px rgba(232,179,57,.6); animation: blink 1.4s ease-in-out infinite; }
+  .pill.wait .pip { background: var(--red); box-shadow: 0 0 12px rgba(215,93,93,.6); animation: blink 1s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  /* ---------- Section base ---------- */
+  section { padding: clamp(80px, 12vw, 140px) 0; border-bottom: 1px solid var(--border); position: relative; }
+  .sec-head { display: grid; grid-template-columns: 200px 1fr; gap: clamp(20px, 4vw, 60px); margin-bottom: clamp(40px, 6vw, 70px); align-items: start; }
+  .sec-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-strong);
+  }
+  .sec-tag .num { color: var(--gold); margin-right: 8px; }
+  .sec-title {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(36px, 5.5vw, 76px);
+    line-height: 1;
+    letter-spacing: -.025em;
+    font-variation-settings: "opsz" 96, "SOFT" 60;
+  }
+  .sec-title em { font-style: italic; color: var(--gold); font-weight: 400; }
+  .sec-sub {
+    margin-top: 28px;
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(18px, 1.6vw, 22px);
+    line-height: 1.55;
+    color: var(--fg-mute);
+    max-width: 720px;
+    font-variation-settings: "opsz" 24;
+  }
+
+  /* ---------- The Problem ---------- */
+  .problem-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(30px, 5vw, 80px);
+    align-items: start;
+  }
+  .problem-text p {
+    font-family: var(--serif);
+    font-size: clamp(19px, 1.5vw, 23px);
+    line-height: 1.6;
+    color: var(--fg);
+    margin-bottom: 24px;
+    font-weight: 300;
+    font-variation-settings: "opsz" 24;
+  }
+  .problem-text p .hl {
+    color: var(--gold);
+    font-style: italic;
+  }
+  .problem-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+  .stat {
+    background: var(--bg);
+    padding: 32px 28px;
+  }
+  .stat .n {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 56px;
+    line-height: 1;
+    color: var(--gold);
+    letter-spacing: -.03em;
+    font-variation-settings: "opsz" 144;
+  }
+  .stat .lbl {
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    letter-spacing: .06em;
+  }
+
+  /* ---------- Chaos scene (overlapping terminals) ---------- */
+  .chaos {
+    position: relative;
+    height: 380px;
+    margin: 50px 0 0;
+  }
+  .term {
+    position: absolute;
+    width: 420px;
+    background: #0a0910;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 11px;
+    box-shadow: 0 30px 70px -25px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.02) inset;
+    transition: transform .4s;
+  }
+  .term .titlebar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--fg-faint);
+    background: #15141a;
+  }
+  .term .titlebar .dots { display: flex; gap: 4px; }
+  .term .titlebar .dots span { width: 7px; height: 7px; border-radius: 50%; background: #2b2933; }
+  .term .titlebar .label { letter-spacing: .04em; }
+  .term .body { padding: 14px 16px; color: var(--fg-mute); line-height: 1.7; min-height: 110px; }
+  .term.focused { z-index: 3; transform: translate(20px, 30px) rotate(0deg); }
+  .term.behind-l { z-index: 2; transform: translate(-180px, 80px) rotate(-2deg); opacity: .85; }
+  .term.behind-r { z-index: 2; transform: translate(280px, 110px) rotate(2.5deg); opacity: .78; }
+  .term.farback { z-index: 1; transform: translate(120px, -40px) rotate(1.5deg); opacity: .35; }
+  .term .cursor { display: inline-block; width: 7px; height: 13px; background: var(--fg); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+  .term .ok { color: var(--green); }
+  .term .warn-line { color: var(--red); }
+  .term .prompt { color: var(--green); }
+  .term .hidden-warn {
+    position: absolute;
+    top: 10px; right: 12px;
+    background: var(--red-soft);
+    color: var(--red);
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    animation: pulse 1.4s ease-out infinite;
+    border: 1px solid rgba(215, 93, 93, .3);
+  }
+  .term.focused .hidden-warn { display: none; }
+  .chaos-caption {
+    position: absolute;
+    bottom: -8px; left: 0; right: 0;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .chaos-caption em { color: var(--red); font-style: normal; }
+
+  /* Pain counter (how long B has been waiting) */
+  .pain-counter {
+    margin-top: 60px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    border-radius: 10px;
+    padding: 36px 40px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 36px;
+    align-items: center;
+  }
+  .pain-counter .pulse-ring {
+    position: relative;
+    width: 64px; height: 64px;
+    display: grid; place-items: center;
+  }
+  .pain-counter .pulse-ring::before, .pain-counter .pulse-ring::after {
+    content: ""; position: absolute; inset: 0;
+    border: 2px solid var(--red); border-radius: 50%;
+    animation: ringExpand 2.4s ease-out infinite;
+    opacity: 0;
+  }
+  .pain-counter .pulse-ring::after { animation-delay: 1.2s; }
+  .pain-counter .pulse-ring .core {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 16px var(--red);
+  }
+  @keyframes ringExpand {
+    0% { transform: scale(.5); opacity: .8; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .pain-counter .story {
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.5;
+    color: var(--fg);
+    font-weight: 300;
+    font-variation-settings: "opsz" 24;
+  }
+  .pain-counter .story em { color: var(--red); font-style: italic; font-weight: 400; }
+  .pain-counter .story .dim { color: var(--fg-mute); }
+  .pain-counter .clock {
+    text-align: right;
+    font-family: var(--mono);
+  }
+  .pain-counter .clock .t {
+    font-size: 42px;
+    color: var(--red);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1;
+  }
+  .pain-counter .clock .lbl {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--fg-faint);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+
+  /* Transformation arrow */
+  .arrow-down {
+    display: flex; flex-direction: column; align-items: center;
+    margin: 60px 0 0;
+    color: var(--gold);
+  }
+  .arrow-down .lbl {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--fg-mute);
+    margin-bottom: 14px;
+  }
+  .arrow-down .lbl em { color: var(--gold); font-style: normal; }
+  .arrow-down .line {
+    width: 1px; height: 60px;
+    background: linear-gradient(180deg, transparent, var(--gold));
+    position: relative;
+  }
+  .arrow-down .line::after {
+    content: "";
+    position: absolute;
+    bottom: -1px; left: 50%; transform: translateX(-50%) rotate(45deg);
+    width: 9px; height: 9px;
+    border-right: 1px solid var(--gold);
+    border-bottom: 1px solid var(--gold);
+  }
+
+  /* ---------- Live dashboard ---------- */
+  .dash {
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.02) inset;
+  }
+  .dash-titlebar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    background: linear-gradient(180deg, #1a1822, #15141a);
+  }
+  .dots { display: flex; gap: 7px; }
+  .dots span { width: 11px; height: 11px; border-radius: 50%; background: #2b2933; }
+  .dots span:nth-child(1) { background: #4a3a3a; }
+  .dots span:nth-child(2) { background: #4a4528; }
+  .dots span:nth-child(3) { background: #354a35; }
+  .dash-titlebar .label { color: var(--fg-mute); display: flex; align-items: center; gap: 10px; }
+  .dash-titlebar .label::before {
+    content: ""; width: 14px; height: 14px;
+    background: currentColor; color: var(--gold);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M3 12h3l3-9 6 18 3-9h3'/></svg>") center/contain no-repeat;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M3 12h3l3-9 6 18 3-9h3'/></svg>") center/contain no-repeat;
+  }
+  .dash-titlebar .pulse { color: var(--green); font-size: 11px; display: flex; align-items: center; gap: 6px; }
+  .dash-titlebar .pulse::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s ease-out infinite;
+  }
+
+  .dash-section-title {
+    padding: 18px 24px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .dash-section-title .badge { color: var(--fg); }
+
+  .session-list { padding: 0 12px 14px; }
+  .sess {
+    display: grid;
+    grid-template-columns: 26px 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 12px;
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+    transition: background .2s;
+    cursor: pointer;
+    position: relative;
+  }
+  .sess:hover { background: rgba(255,255,255,.02); }
+  .sess.wait { border-left-color: var(--red); background: rgba(215, 93, 93, .04); }
+  .sess.run { border-left-color: var(--amber); }
+  .sess.idle { border-left-color: var(--green); }
+
+  .sess .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-left: 4px;
+  }
+  .sess.wait .dot { background: var(--red); box-shadow: 0 0 0 4px rgba(215,93,93,.15); animation: pulse 1.4s ease-out infinite; }
+  .sess.run .dot { background: var(--amber); box-shadow: 0 0 0 4px rgba(232,179,57,.15); animation: pulse 1.6s ease-out infinite; }
+  .sess.idle .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(126,184,126,.12); }
+
+  .sess .name {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sess .name .ico {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    background: var(--bg-card);
+    display: grid; place-items: center;
+    font-size: 12px;
+    color: var(--fg-mute);
+    border: 1px solid var(--border);
+  }
+  .sess .desc {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    margin-top: 3px;
+  }
+  .sess .desc .tool { color: var(--gold); }
+  .sess .desc .path { color: var(--fg-faint); }
+  .sess .time {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .sess .sid {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-faint);
+    text-align: right;
+  }
+
+  .dash-foot {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+  }
+
+  /* Notification mockup */
+  .notif {
+    position: absolute;
+    top: 60px; right: 24px;
+    width: 320px;
+    background: #1f1d28;
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--red);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-size: 13px;
+    box-shadow: 0 20px 50px -10px rgba(0,0,0,.6);
+    transform: translateX(40px); opacity: 0;
+    animation: slideIn 1.2s 1.6s ease-out forwards;
+  }
+  @keyframes slideIn { to { transform: none; opacity: 1; } }
+  .notif .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .notif .head .ic { color: var(--red); }
+  .notif .head .app { color: var(--fg-mute); font-family: var(--mono); font-size: 11px; letter-spacing: .04em; }
+  .notif .body { color: var(--fg); font-family: var(--sans); line-height: 1.45; margin-bottom: 10px; }
+  .notif .body .name { color: var(--gold); font-weight: 500; }
+  .notif .actions { display: flex; gap: 6px; }
+  .notif .actions .btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    color: var(--fg);
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: var(--sans);
+  }
+  .notif .actions .btn.primary { background: var(--gold); color: #1a1408; border-color: var(--gold); }
+
+  /* ---------- How it works ---------- */
+  .flow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: start;
+  }
+  .flow-nodes {
+    display: flex; flex-direction: column; gap: 20px;
+    position: relative;
+  }
+  .node {
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    border-radius: 8px;
+    padding: 22px 24px;
+    position: relative;
+    transition: transform .3s, border-color .3s;
+  }
+  .node:hover { transform: translateX(4px); border-color: var(--gold); }
+  .node .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .node .name {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--fg);
+    margin-bottom: 6px;
+    font-variation-settings: "opsz" 36;
+  }
+  .node .body {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-mute);
+    line-height: 1.5;
+  }
+  .node-arrow {
+    width: 1px;
+    height: 28px;
+    background: linear-gradient(180deg, transparent, var(--gold), transparent);
+    margin-left: 32px;
+  }
+
+  .code-card {
+    border: 1px solid var(--border-strong);
+    background: #0a0910;
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: var(--mono);
+  }
+  .code-card .head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--fg-mute);
+    background: var(--bg-elev);
+  }
+  .code-card .head .file { color: var(--gold); }
+  .code-card pre {
+    padding: 20px 22px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--fg);
+    overflow-x: auto;
+  }
+  .tk-key { color: #d4a0a0; }
+  .tk-str { color: #b8c99c; }
+  .tk-com { color: #6a6678; font-style: italic; }
+  .tk-fn  { color: #e8b339; }
+  .tk-num { color: #b4a0d4; }
+  .tk-var { color: #9ab8d4; }
+
+  /* ---------- Three pillars ---------- */
+  .pillars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .pillar {
+    background: var(--bg);
+    padding: 44px 36px;
+    position: relative;
+  }
+  .pillar .num {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--gold);
+    margin-bottom: 22px;
+    font-variation-settings: "opsz" 36;
+  }
+  .pillar h3 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    letter-spacing: -.02em;
+    color: var(--fg);
+    font-variation-settings: "opsz" 48;
+  }
+  .pillar h3 em { font-style: italic; color: var(--gold); }
+  .pillar p {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--fg-mute);
+    font-variation-settings: "opsz" 18;
+  }
+  .pillar .icon {
+    width: 44px; height: 44px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    display: grid; place-items: center;
+    color: var(--gold);
+  }
+
+  /* ---------- Engineering depth ---------- */
+  .depth-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+  .depth-item {
+    border-top: 1px solid var(--border-strong);
+    padding: 32px 0;
+  }
+  .depth-item .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .depth-item h4 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 26px;
+    line-height: 1.2;
+    margin-bottom: 14px;
+    color: var(--fg);
+    font-variation-settings: "opsz" 36;
+  }
+  .depth-item h4 em { font-style: italic; color: var(--gold); }
+  .depth-item p {
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--fg-mute);
+    margin-bottom: 18px;
+  }
+  .depth-item .evidence {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    color: var(--fg);
+    line-height: 1.6;
+  }
+  .depth-item .evidence .em { color: var(--gold); }
+  .depth-item .evidence .cm { color: var(--fg-faint); }
+
+  /* ---------- Config table ---------- */
+  .cfg {
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-elev);
+  }
+  .cfg-row {
+    display: grid;
+    grid-template-columns: 1.4fr .6fr 2.5fr;
+    align-items: center;
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--border);
+    transition: background .2s;
+  }
+  .cfg-row:last-child { border-bottom: none; }
+  .cfg-row:hover { background: rgba(255,255,255,.02); }
+  .cfg-row.head {
+    background: #181620;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: 14px 28px;
+  }
+  .cfg-row .key {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--gold);
+  }
+  .cfg-row .def {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--fg);
+    text-align: center;
+  }
+  .cfg-row .def .pill-mini {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .cfg-row .desc {
+    font-size: 14px;
+    color: var(--fg-mute);
+    line-height: 1.5;
+  }
+
+  /* ---------- Install ---------- */
+  .ide-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .ide {
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    border-radius: 10px;
+    padding: 28px 30px;
+    transition: border-color .3s, transform .3s;
+  }
+  .ide:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .ide-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .ide-name {
+    font-family: var(--serif);
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--fg);
+    letter-spacing: -.01em;
+  }
+  .ide-name em { font-style: italic; color: var(--gold); }
+  .ide-market {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    color: var(--fg-mute);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .ide p { font-size: 14px; color: var(--fg-mute); line-height: 1.6; margin-bottom: 16px; }
+  .ide pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: #0a0910;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    color: var(--fg);
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .ide pre .cm { color: var(--fg-faint); }
+  .ide pre .acc { color: var(--gold); }
+
+  /* ---------- Test rigor ---------- */
+  .test-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+  .tstat {
+    padding: 36px 30px;
+    border-right: 1px solid var(--border);
+    background: var(--bg-elev);
+  }
+  .tstat:last-child { border-right: none; }
+  .tstat .n {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 72px;
+    line-height: 1;
+    color: var(--gold);
+    letter-spacing: -.04em;
+    font-variation-settings: "opsz" 144;
+  }
+  .tstat .lbl {
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  .test-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; }
+  .test-list li {
+    list-style: none;
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    font-size: 14.5px;
+    color: var(--fg);
+    line-height: 1.55;
+  }
+  .test-list li .check {
+    width: 18px; height: 18px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    border: 1px solid var(--gold);
+    border-radius: 4px;
+    color: var(--gold);
+    display: grid; place-items: center;
+    font-size: 11px;
+  }
+  .test-list li .label {
+    font-family: var(--mono);
+    color: var(--gold);
+    margin-right: 6px;
+  }
+
+  /* ---------- Footer ---------- */
+  footer {
+    padding: 80px 0 50px;
+  }
+  .foot {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: 60px;
+    padding-bottom: 60px;
+    border-bottom: 1px solid var(--border);
+  }
+  .foot-col h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-mute);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .foot-col ul { list-style: none; }
+  .foot-col li { margin-bottom: 10px; font-size: 14px; color: var(--fg-mute); }
+  .foot-col li a { color: var(--fg); transition: color .2s; }
+  .foot-col li a:hover { color: var(--gold); }
+  .foot-brand .big {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: -.03em;
+    margin-bottom: 18px;
+    font-variation-settings: "opsz" 96;
+  }
+  .foot-brand .big em { font-style: italic; color: var(--gold); }
+  .foot-brand p { font-size: 14px; color: var(--fg-mute); line-height: 1.6; max-width: 340px; }
+  .copyright {
+    margin-top: 36px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-faint);
+    letter-spacing: .06em;
+    text-align: center;
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 980px) {
+    .sec-head { grid-template-columns: 1fr; gap: 14px; }
+    .problem-grid, .flow, .depth-grid, .ide-grid, .test-list { grid-template-columns: 1fr; }
+    .pillars { grid-template-columns: 1fr; }
+    .test-stats { grid-template-columns: 1fr 1fr; }
+    .tstat { border-right: none; border-bottom: 1px solid var(--border); }
+    .foot { grid-template-columns: 1fr 1fr; gap: 40px; }
+    .hero-sub { grid-template-columns: 1fr; }
+    .hero-meta { grid-template-columns: 1fr 1fr; }
+    .cfg-row { grid-template-columns: 1fr; gap: 6px; }
+    .cfg-row .def { text-align: left; }
+  }
+  @media (max-width: 640px) {
+    .test-stats, .problem-stats { grid-template-columns: 1fr; }
+    .foot { grid-template-columns: 1fr; }
+    .topbar-right span:not(:last-child) { display: none; }
+    .notif { right: 12px; left: 12px; width: auto; }
+    .chaos { height: auto; display: flex; flex-direction: column; gap: 12px; }
+    .term { position: static; width: 100%; transform: none !important; opacity: 1 !important; }
+    .pain-counter { grid-template-columns: 1fr; text-align: center; }
+    .pain-counter .clock { text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============== TOP BAR ============== -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h3l3-9 6 18 3-9h3"/>
+        </svg>
+      </div>
+      <span class="brand-name">claude-task-monitor<span class="brand-ver">/ v0.1.1</span></span>
+    </div>
+    <div class="topbar-right">
+      <a href="#problem"><span class="status-dot"></span>痛点</a>
+      <a href="#dashboard">解法</a>
+      <a href="#how">原理</a>
+      <a href="#install">安装</a>
+      <a href="https://github.com/codewithwu/Claude-Task-Monitor" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============== HERO ============== -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid reveal">
+      <div>
+        <div class="eyebrow">
+          <span class="line"></span>
+          <span class="dot"></span>
+          <span>一个 VS Code 扩展 · 2026 公开首发</span>
+        </div>
+
+        <h1 class="hero-title">
+          Claude<br>
+          <em>Task</em> <span class="stop">Monitor</span>
+        </h1>
+
+        <div class="hero-sub">
+          <p class="hero-lede">
+            当你同时开了<em>多个终端</em>跑 Claude Code 长任务——
+            你的注意力在 A 窗口，但 B 任务早就在等你点确认了，
+            而你<em>完全没看见</em>。
+            这个扩展把那些<em>「背后的等待」</em> 拽到 IDE 侧边栏里，让每一颗暂停都无处可藏。
+          </p>
+          <div class="hero-meta">
+            <div class="meta-cell">
+              <span class="k">类型</span>
+              <span class="v">VS Code 扩展</span>
+            </div>
+            <div class="meta-cell">
+              <span class="k">协议</span>
+              <span class="v">MIT 开源</span>
+            </div>
+            <div class="meta-cell">
+              <span class="k">运行时</span>
+              <span class="v">TS / Node ≥ 18</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-trio">
+          <div class="pill idle"><span class="pip"></span>idle · 待命</div>
+          <div class="pill run"><span class="pip"></span>running · 执行中</div>
+          <div class="pill wait"><span class="pip"></span>waiting · 等待人工确认</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============== THE PROBLEM ============== -->
+<section id="problem">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">01 —</span>痛点</div>
+      <h2 class="sec-title">你的注意力<em>只能</em>在一个窗口里</h2>
+    </div>
+    <p class="sec-sub reveal">
+      用 Claude Code 干活，<em>并行</em> 是常态：一个终端改 API、一个跑迁移、一个在重构。
+      但屏幕前的你，一次只能盯着一个标签页、一个工作区、一条滚动输出。
+    </p>
+
+    <!-- ============== CHAOS SCENE ============== -->
+    <div class="chaos reveal">
+      <!-- 1. Focused terminal: user is reading -->
+      <div class="term focused">
+        <div class="titlebar">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="label">~/Code/polaris-api · iTerm</div>
+        </div>
+        <div class="body">
+          <div><span class="prompt">$</span> claude</div>
+          <div style="margin-top:6px;color:var(--fg);">› 帮我把 orders.ts 里的 N+1 查询改成预加载</div>
+          <div style="margin-top:8px;"><span class="ok">✓</span> Reading src/services/orders.ts</div>
+          <div><span class="ok">✓</span> Identified 3 N+1 hotspots</div>
+          <div><span class="ok">✓</span> Refactoring batch 1 / 3</div>
+          <div style="margin-top:6px;color:var(--fg);">› 继续<span class="cursor"></span></div>
+        </div>
+      </div>
+
+      <!-- 2. Behind-left: B task waiting, hidden -->
+      <div class="term behind-l">
+        <div class="titlebar">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="label">~/Documents/Claude-Task-Monitor · iTerm</div>
+        </div>
+        <div class="body">
+          <div><span class="prompt">$</span> claude</div>
+          <div style="margin-top:6px;color:var(--fg);">› 删除所有 .bak 文件</div>
+          <div style="margin-top:8px;"><span class="warn-line">⚠ Permission required</span></div>
+          <div style="color:var(--fg-faint);font-size:10px;">Bash · rm -rf **/*.bak</div>
+        </div>
+        <div class="hidden-warn">● WAITING</div>
+      </div>
+
+      <!-- 3. Behind-right: another task running -->
+      <div class="term behind-r">
+        <div class="titlebar">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="label">~/.config/dotfiles · iTerm</div>
+        </div>
+        <div class="body">
+          <div><span class="prompt">$</span> claude</div>
+          <div style="margin-top:6px;color:var(--fg);">› 整理我的 zsh 配置</div>
+          <div style="margin-top:8px;color:var(--amber);">◐ Running tests…</div>
+        </div>
+      </div>
+
+      <!-- 4. Far back: partially visible -->
+      <div class="term farback">
+        <div class="titlebar">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="label">~/blog · iTerm</div>
+        </div>
+        <div class="body">
+          <div><span class="prompt">$</span> claude</div>
+        </div>
+      </div>
+
+      <div class="chaos-caption">
+        你的屏幕 · <em>3 个 Claude 任务在跑，1 个已停 23 分钟</em> · 你只看见了最前面那一个
+      </div>
+    </div>
+
+    <!-- ============== PAIN COUNTER ============== -->
+    <div class="pain-counter reveal">
+      <div class="pulse-ring"><div class="core"></div></div>
+      <div class="story">
+        你的眼睛在 A 任务的输出里，<em>B 任务的权限确认请求</em>已经被压在窗口堆栈的最底层。<br>
+        <span class="dim">它不会失败，不会报错，不会重试——它只是安静地停在那里，</span>
+        <em>等你什么时候想起来切回去</em>。
+      </div>
+      <div class="clock">
+        <div class="t" data-wait>23:47</div>
+        <div class="lbl">B 已等待</div>
+      </div>
+    </div>
+
+    <!-- ============== TRANSFORMATION ARROW ============== -->
+    <div class="arrow-down reveal">
+      <div class="lbl">所以有了<em> Claude Task Monitor</em></div>
+      <div class="line"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== DASHBOARD ============== -->
+<section id="dashboard">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">02 —</span>解法</div>
+      <h2 class="sec-title">所有等待<em>拽到</em>侧边栏</h2>
+    </div>
+    <p class="sec-sub reveal">
+      想法很朴素：把那些<em>散落在终端里的状态</em> 收拢到 IDE 侧边栏——一颗红点、一个项目名、一条当前工具的描述。
+      你不需要切窗口，<em>余光里</em> 就能看到 B 任务正在等你。
+    </p>
+
+    <div class="dash reveal" style="margin-top: 60px;">
+      <div class="dash-titlebar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="label">CLAUDE TASK MONITOR · SESSIONS</div>
+        <div class="pulse">3 ACTIVE</div>
+      </div>
+
+      <div class="dash-section-title">
+        <span>● WAITING · 1</span>
+        <span class="badge">需要你确认</span>
+      </div>
+      <div class="session-list">
+
+        <div class="sess wait">
+          <div class="dot"></div>
+          <div>
+            <div class="name">
+              <span class="ico">⏵</span>
+              claude-task-monitor
+            </div>
+            <div class="desc">
+              <span class="tool">Bash</span> <span>npm run build:integration</span>
+              <span class="path"> · ~/Documents/Claude-Task-Monitor</span>
+            </div>
+          </div>
+          <div class="time">12s</div>
+          <div class="sid">a3f7…c1</div>
+        </div>
+      </div>
+
+      <div class="dash-section-title">
+        <span>● RUNNING · 1</span>
+        <span class="badge">执行中</span>
+      </div>
+      <div class="session-list">
+
+        <div class="sess run">
+          <div class="dot"></div>
+          <div>
+            <div class="name">
+              <span class="ico">⏵</span>
+              polaris-api
+            </div>
+            <div class="desc">
+              <span class="tool">Read</span> <span>src/services/orders.ts</span>
+              <span class="path"> · ~/Code/polaris-api</span>
+            </div>
+          </div>
+          <div class="time" data-counter="42">42s</div>
+          <div class="sid">8d12…ef</div>
+        </div>
+      </div>
+
+      <div class="dash-section-title">
+        <span>● IDLE · 1</span>
+        <span class="badge">待命</span>
+      </div>
+      <div class="session-list">
+
+        <div class="sess idle">
+          <div class="dot"></div>
+          <div>
+            <div class="name">
+              <span class="ico">⏵</span>
+              dotfiles
+            </div>
+            <div class="desc">
+              <span class="tool">—</span> <span style="color:var(--fg-faint);">等待输入</span>
+              <span class="path"> · ~/.config/dotfiles</span>
+            </div>
+          </div>
+          <div class="time">3m 17s</div>
+          <div class="sid">20ab…77</div>
+        </div>
+      </div>
+
+      <div class="dash-foot">
+        <span>~/.claude-task-monitor/sessions/</span>
+        <span>⤴ 点击条目跳转项目</span>
+      </div>
+
+      <!-- Notification mockup -->
+      <div class="notif">
+        <div class="head">
+          <span class="ic">⚠</span>
+          <span class="app">Claude Task Monitor</span>
+        </div>
+        <div class="body">
+          <span class="name">claude-task-monitor</span> 等待权限确认：<strong>Bash</strong>
+        </div>
+        <div class="actions">
+          <span class="btn primary">打开项目</span>
+          <span class="btn">忽略</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== HOW IT WORKS ============== -->
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">03 —</span>原理</div>
+      <h2 class="sec-title">一条<em>事件</em>的旅程</h2>
+    </div>
+    <p class="sec-sub reveal">
+      从你在终端输入 <code style="font-family:var(--mono);color:var(--gold);">claude</code> 到侧边栏亮起一颗灯，只有一条单向流。
+      没有 daemon、没有 polling 循环、没有常驻进程——只有 <em>Hook → JSONL → Watcher → Tree View</em>。
+    </p>
+
+    <div class="flow reveal" style="margin-top: 60px;">
+      <div class="flow-nodes">
+        <div class="node">
+          <div class="label">01 · Trigger</div>
+          <div class="name">Claude Code 触发 Hook</div>
+          <div class="body">在 <em style="color:var(--gold);">~/.claude/settings.json</em> 注入的 <em style="color:var(--gold);">PreToolUse / Notification / SessionEnd</em> 事件。</div>
+        </div>
+        <div class="node-arrow"></div>
+        <div class="node">
+          <div class="label">02 · Capture</div>
+          <div class="name">hook.sh 沿进程树定位 claude</div>
+          <div class="body">不能信 <em style="color:var(--gold);">$PPID</em>——它转瞬即逝。从当前 PID 向上 walk，直到 <em style="color:var(--gold);">comm == "claude"</em>。</div>
+        </div>
+        <div class="node-arrow"></div>
+        <div class="node">
+          <div class="label">03 · Persist</div>
+          <div class="name">追加写入 .jsonl</div>
+          <div class="body"><em style="color:var(--gold);">~/.claude-task-monitor/sessions/&lt;pid&gt;.jsonl</em>，每行一个 event，append-only。</div>
+        </div>
+        <div class="node-arrow"></div>
+        <div class="node">
+          <div class="label">04 · React</div>
+          <div class="name">chokidar + Reducer + Tree</div>
+          <div class="body">文件变化即增量解析；<em style="color:var(--gold);">waiting</em> 态变化触发通知 + 排序前置。</div>
+        </div>
+      </div>
+
+      <div class="code-card">
+        <div class="head">
+          <span class="file">~/.claude/settings.json</span>
+          <span>合并自 hook.sh</span>
+        </div>
+<pre><span class="tk-com">// 用户原有 hooks 字段被保留</span>
+{
+  <span class="tk-key">"hooks"</span>: {
+    <span class="tk-key">"PreToolUse"</span>: [
+      {
+        <span class="tk-key">"matcher"</span>: <span class="tk-str">"*"</span>,
+        <span class="tk-key">"hooks"</span>: [
+          {
+            <span class="tk-key">"type"</span>: <span class="tk-str">"command"</span>,
+            <span class="tk-key">"command"</span>: <span class="tk-str">"bash ~/.claude-task-monitor/hook.sh"</span>
+          }
+        ]
+      }
+    ],
+    <span class="tk-key">"Notification"</span>: [ ... ],
+    <span class="tk-key">"SessionEnd"</span>:  [ ... ]
+  }
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== THREE PILLARS ============== -->
+<section id="pillars">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">04 —</span>特性</div>
+      <h2 class="sec-title">三个<em>不可妥协</em>的设计</h2>
+    </div>
+    <p class="sec-sub reveal">
+      写这个扩展的三个月里，砍掉了十几种「也许有用」的功能，留下来的是真正每天会触碰的三个。
+    </p>
+
+    <div class="pillars reveal" style="margin-top: 60px;">
+      <div class="pillar">
+        <div class="icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+          </svg>
+        </div>
+        <div class="num">i.</div>
+        <h3><em>余光里</em>的提醒</h3>
+        <p>活动栏图标常驻脉冲，侧边栏每秒钟重算一次持续时间。你不需要切窗口，<em>不需要打开终端</em>，眼睛余光扫到一颗红点，就知道那边的 B 任务正等你点头。</p>
+      </div>
+
+      <div class="pillar">
+        <div class="icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 5l7 7-7 7"/>
+          </svg>
+        </div>
+        <div class="num">ii.</div>
+        <h3>点击<em>直接到达</em></h3>
+        <p>侧边栏条目或弹出的 VS Code 通知里点「打开项目」，焦点切到那个 session 所在的工作区（已开就聚焦，没开就用同窗口打开）。中间没有「先看是哪个项目」的二跳。</p>
+      </div>
+
+      <div class="pillar">
+        <div class="icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.36 2.64L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64L3 16"/><path d="M3 21v-5h5"/>
+          </svg>
+        </div>
+        <div class="num">iii.</div>
+        <h3>安装卸载<em>都干净</em></h3>
+        <p>首次激活时把 hooks 块<em>合并</em>进 settings.json，对用户原有 hooks 保持幂等。卸载时弹确认对话框，可一并清掉 hook.sh 与我们注入的字段——你的其他配置丝毫未动。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== ENGINEERING DEPTH ============== -->
+<section id="engineering">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">05 —</span>工程</div>
+      <h2 class="sec-title">那些<em>看不见的</em>决定</h2>
+    </div>
+    <p class="sec-sub reveal">
+      一千行不到的源码里藏着几个反复打磨过的决策点。下面是 README 不会告诉你的那部分。
+    </p>
+
+    <div class="depth-grid reveal" style="margin-top: 50px;">
+
+      <div class="depth-item">
+        <div class="tag">PID liveness · 进程树</div>
+        <h4>不能信 <em>$PPID</em>，得 <em>walk up</em></h4>
+        <p>Hook 触发时，<code style="font-family:var(--mono);color:var(--gold);">$PPID</code> 经常已经是 wrapper 脚本的 PID。直接用它来命名 .jsonl 会导致多个真实 CLI 写到同一个文件。修复：</p>
+        <div class="evidence">
+          <span class="cm"># hook.sh 片段</span><br>
+          pid=<span class="em">$$</span><br>
+          <span class="cm"># 沿进程树向上 walk，直到 comm == "claude"</span><br>
+          <span style="color:var(--fg-mute);">while</span> [ <span class="em">"$pid"</span> != <span class="em">"1"</span> ]; <span style="color:var(--fg-mute);">do</span><br>
+          &nbsp;&nbsp;comm=$(<span class="em">ps -o comm=</span> -p <span class="em">$pid</span> 2>/dev/null)<br>
+          &nbsp;&nbsp;[ <span class="em">"$comm"</span> = <span class="em">"claude"</span> ] && <span style="color:var(--fg-mute);">break</span><br>
+          &nbsp;&nbsp;pid=$(<span class="em">ps -o ppid=</span> -p <span class="em">$pid</span> 2>/dev/null)<br>
+          <span style="color:var(--fg-mute);">done</span>
+        </div>
+      </div>
+
+      <div class="depth-item">
+        <div class="tag">liveness check · 死亡检测</div>
+        <h4>能识别 <em>kill -9</em>，也能识别 <em>SIGSTOP</em></h4>
+        <p>每 5 秒遍历一次 store，对每个 session 的 durable PID 做 <em>kill -0</em>。如果进程已死，把对应 .jsonl 归档进 <em>.ended/</em>。同时识别 SIGSTOP（Ctrl+Z）和僵尸态——它们同样该从侧边栏消失。</p>
+        <div class="evidence">
+          <span class="cm">// 三条测试用例覆盖三个死亡路径</span><br>
+          test(<span class="em">'kill -9 路径'</span>, spawnRealChild → <span class="em">kill -9</span>)<br>
+          test(<span class="em">'SIGSTOP 路径'</span>, spawnRealChild → <span class="em">kill -SIGSTOP</span>)<br>
+          test(<span class="em">'正常退出路径'</span>, spawnRealChild → <span class="em">自然结束</span>)
+        </div>
+      </div>
+
+      <div class="depth-item">
+        <div class="tag">settings.json · 幂等合并</div>
+        <h4>用户的 hooks 块<em>不能丢</em></h4>
+        <p>合并时按 event name 追加一条 ours，但 <em>只追加</em>，从不覆盖。这样不管用户已经有几条 PreToolUse，我们的都会成为额外一条；卸载时也只清掉我们注入的那条。</p>
+        <div class="evidence">
+          <span class="cm"># OWNER_TAG 标注归属，避免卸载时误伤</span><br>
+          <span class="em">_owner</span>: <span class="em">"claude-task-monitor"</span><br>
+          <span class="cm"># 卸载逻辑据此识别 ours，只删 ours</span>
+        </div>
+      </div>
+
+      <div class="depth-item">
+        <div class="tag">watcher · offset 持久化</div>
+        <h4>重启扩展<em>不重复处理</em>旧行</h4>
+        <p>首次添加一个 .jsonl 时，watcher 不会从第 0 行重放——它会读完整文件后，把内部 offset 设到文件末尾。这样 VS Code 重启后，老事件不会重演成「假 waiting」。</p>
+        <div class="evidence">
+          bootstrap → <span class="em">read full file</span> → apply<br>
+          <span class="cm">↓</span><br>
+          watcher.<span class="em">setOffset</span>(file, byteLength) <span class="cm">// 从这里开始 tail</span>
+        </div>
+      </div>
+
+      <div class="depth-item">
+        <div class="tag">notification · dedupe</div>
+        <h4>一次等待，<em>只打扰一次</em></h4>
+        <p>同一个 session 在 30 秒内即使触发多个 Notification 事件，弹窗也只出现一次。配置项 <em style="color:var(--gold);">notifyDedupeSeconds</em> 可调——如果你的工作流事件特别密集，可以关到 5 秒。</p>
+        <div class="evidence">
+          <span class="em">if</span> (now - lastNotify[sessionId]) < <span class="em">dedupeSec</span><br>
+          &nbsp;&nbsp;<span style="color:var(--fg-mute);">return</span>  <span class="cm">// 静默</span><br>
+          lastNotify[sessionId] = now<br>
+          <span class="em">showWarningMessage</span>(...)
+        </div>
+      </div>
+
+      <div class="depth-item">
+        <div class="tag">test · 真实子进程</div>
+        <h4><em>真打实弹</em>，不只 mock</h4>
+        <p>vitest 单元测试覆盖 reducer、store、installer、watcher；集成测试用 <em style="color:var(--gold);">@vscode/test-electron</em> 启一个真 VS Code 实例跑端到端。liveness 用例则 fork 出真子进程覆盖 kill -9 / SIGSTOP / 正常退出三条路径。</p>
+        <div class="evidence">
+          <span class="em">pnpm test</span>                  <span class="cm"># 单元测试</span><br>
+          <span class="em">pnpm test:integration</span>      <span class="cm"># 启动一个真 VS Code 实例</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============== CONFIG ============== -->
+<section id="config">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">06 —</span>配置</div>
+      <h2 class="sec-title">默认合理，<em>也能拧</em></h2>
+    </div>
+    <p class="sec-sub reveal">
+      四个旋钮都做了合理默认值，但你随时可以打开 Settings 拧它们。
+    </p>
+
+    <div class="cfg reveal" style="margin-top: 50px;">
+      <div class="cfg-row head">
+        <div>键名</div>
+        <div style="text-align:center">默认</div>
+        <div>说明</div>
+      </div>
+      <div class="cfg-row">
+        <div class="key">claudeTaskMonitor.staleHours</div>
+        <div class="def"><span class="pill-mini">24</span></div>
+        <div class="desc">文件 mtime 超过该小时数视为僵尸，启动时自动归档到 <em style="color:var(--gold);">.ended/</em></div>
+      </div>
+      <div class="cfg-row">
+        <div class="key">claudeTaskMonitor.notifyDedupeSeconds</div>
+        <div class="def"><span class="pill-mini">30</span></div>
+        <div class="desc">同一 session 在该秒数内不重复弹等待权限通知</div>
+      </div>
+      <div class="cfg-row">
+        <div class="key">claudeTaskMonitor.refreshIntervalMs</div>
+        <div class="def"><span class="pill-mini">1000</span></div>
+        <div class="desc">侧边栏持续时间显示的刷新间隔（毫秒）</div>
+      </div>
+      <div class="cfg-row">
+        <div class="key">claudeTaskMonitor.livenessCheckIntervalMs</div>
+        <div class="def"><span class="pill-mini">5000</span></div>
+        <div class="desc">进程活性检测间隔（毫秒），用于把 Ctrl+Z / 异常退出的 CLI 从侧边栏移除</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== INSTALL ============== -->
+<section id="install">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">07 —</span>安装</div>
+      <h2 class="sec-title">挑你<em>用的 IDE</em> 装</h2>
+    </div>
+    <p class="sec-sub reveal">
+      不同 IDE 接的不是同一个扩展市场。扩展本身只有一份（<em>Open VSX</em> + GitHub Release），但要走对的路。
+    </p>
+
+    <div class="ide-grid reveal" style="margin-top: 50px;">
+      <div class="ide">
+        <div class="ide-head">
+          <div class="ide-name">VSCodium <em>·</em> Code - OSS</div>
+          <div class="ide-market">Open VSX</div>
+        </div>
+        <p>这些 IDE 默认连 Open VSX。打开扩展面板，搜索 <em style="color:var(--gold);font-style:italic;">claude-task-monitor</em>，点 Install。</p>
+        <pre><span class="cm"># 等价于：</span>
+ext install <span class="acc">codewithwu-cn.claude-task-monitor</span></pre>
+      </div>
+
+      <div class="ide">
+        <div class="ide-head">
+          <div class="ide-name">VS Code <em>·</em> Cursor <em>·</em> Windsurf</div>
+          <div class="ide-market">VSIX</div>
+        </div>
+        <p>这些 IDE 用自家市场，不直连 Open VSX。下载 .vsix 离线包本地安装：</p>
+        <pre><span class="cm"># 1. 从 Releases 下载最新的 .vsix</span>
+<span class="cm"># 2. 命令面板 → "Extensions: Install from VSIX"</span>
+<span class="cm"># 或者：</span>
+<span class="acc">code</span> --install-extension claude-task-monitor-0.1.1.vsix
+<span class="acc">cursor</span> --install-extension claude-task-monitor-0.1.1.vsix</pre>
+      </div>
+
+      <div class="ide" style="grid-column: 1 / -1;">
+        <div class="ide-head">
+          <div class="ide-name">从源码构建 <em>·</em> 开发者</div>
+          <div class="ide-market">git clone</div>
+        </div>
+        <p>标准 pnpm 流程。构建产物即可在本地以 Extension Development Host 模式加载调试。</p>
+        <pre>git clone https://github.com/codewithwu/Claude-Task-Monitor.git
+cd Claude-Task-Monitor
+<span class="acc">pnpm</span> install
+<span class="acc">pnpm</span> build
+<span class="acc">pnpm</span> package             <span class="cm"># 生成 .vsix</span>
+<span class="acc">code</span> --extensionDevelopmentPath=$(<span style="color:var(--fg-mute);">pwd</span>)   <span class="cm"># 调试</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== TEST RIGOR ============== -->
+<section id="testing">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag"><span class="num">08 —</span>质量</div>
+      <h2 class="sec-title">用<em>真东西</em> 测</h2>
+    </div>
+    <p class="sec-sub reveal">
+      mock 数据库的项目我们见太多了。Claude Task Monitor 的 liveness 测试 fork 真子进程、集成测试起真 VS Code。
+    </p>
+
+    <div class="test-stats reveal">
+      <div class="tstat">
+        <div class="n">3</div>
+        <div class="lbl">死亡路径覆盖</div>
+      </div>
+      <div class="tstat">
+        <div class="n">6</div>
+        <div class="lbl">手动验收项</div>
+      </div>
+      <div class="tstat">
+        <div class="n">2</div>
+        <div class="lbl">测试层（unit + e2e）</div>
+      </div>
+      <div class="tstat">
+        <div class="n">0</div>
+        <div class="lbl">mock 模拟生产环境</div>
+      </div>
+    </div>
+
+    <ul class="test-list reveal">
+      <li>
+        <span class="check">✓</span>
+        <span><span class="label">单元测试</span>事件 reducer、SessionStore、installer、watcher 全部覆盖（vitest）</span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span><span class="label">集成测试</span>用 <em style="color:var(--gold);font-style:italic;">@vscode/test-electron</em> 启动一个真实 VS Code 实例</span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span><span class="label">端到端</span>fork 真子进程，覆盖 <em style="color:var(--gold);font-style:italic;">kill -9</em> / <em style="color:var(--gold);font-style:italic;">SIGSTOP</em> / 正常退出三条路径</span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span><span class="label">手动验收</span>多窗口并发、通知防骚扰、异常退出、跳转、持续时间、排序、卸载——7 条逐项跑</span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span><span class="label">CI 类型</span>tsc <em style="color:var(--gold);font-style:italic;">--noEmit</em> 把 ours 类型从 <em style="color:var(--gold);font-style:italic;">any</em> 缩到精确形状</span>
+      </li>
+      <li>
+        <span class="check">✓</span>
+        <span><span class="label">已知局限</span>明确写在 README：远程 SSH 不可、不能聚焦外部终端、暂无历史/统计视图</span>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============== FOOTER ============== -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div class="foot-col foot-brand">
+        <div class="big">Claude <em>Task</em><br>Monitor</div>
+        <p>一个关于「在侧边栏里看见 AI」的工程实践。MIT 开源，欢迎 star、issue、PR。</p>
+      </div>
+
+      <div class="foot-col">
+        <h5>代码</h5>
+        <ul>
+          <li><a href="https://github.com/codewithwu/Claude-Task-Monitor" target="_blank" rel="noopener">GitHub 仓库 ↗</a></li>
+          <li><a href="https://github.com/codewithwu/Claude-Task-Monitor/releases" target="_blank" rel="noopener">Releases ↗</a></li>
+          <li><a href="https://github.com/codewithwu/Claude-Task-Monitor/issues" target="_blank" rel="noopener">Issues ↗</a></li>
+          <li><a href="https://github.com/codewithwu/Claude-Task-Monitor/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog ↗</a></li>
+        </ul>
+      </div>
+
+      <div class="foot-col">
+        <h5>市场</h5>
+        <ul>
+          <li><a href="https://open-vsx.org/extension/codewithwu-cn/claude-task-monitor" target="_blank" rel="noopener">Open VSX ↗</a></li>
+          <li><a href="https://marketplace.visualstudio.com/items?itemName=codewithwu-cn.claude-task-monitor" target="_blank" rel="noopener">VS Marketplace ↗</a></li>
+        </ul>
+      </div>
+
+      <div class="foot-col">
+        <h5>生态</h5>
+        <ul>
+          <li><a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">Claude Code Hooks ↗</a></li>
+          <li><a href="https://code.visualstudio.com/api" target="_blank" rel="noopener">VS Code Extension API ↗</a></li>
+          <li>License · MIT</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="copyright">
+      <span>© 2026 codewithwu</span> · <span>MIT License</span> · <span>Built with TypeScript, chokidar &amp; vitest</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Reveal on scroll
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal').forEach((el) => obs.observe(el));
+
+  // Animate the "running" session's duration counter
+  (function () {
+    const el = document.querySelector('.sess.run .time');
+    if (!el) return;
+    let s = 42;
+    setInterval(() => {
+      s += 1;
+      if (s < 60) el.textContent = s + 's';
+      else el.textContent = Math.floor(s / 60) + 'm ' + (s % 60).toString().padStart(2, '0') + 's';
+    }, 1000);
+  })();
+
+  // Animate the "B task has been waiting" counter in the pain section
+  (function () {
+    const el = document.querySelector('[data-wait]');
+    if (!el) return;
+    let total = 23 * 60 + 47;
+    setInterval(() => {
+      total += 1;
+      const m = Math.floor(total / 60), s = total % 60;
+      el.textContent = m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0');
+    }, 1000);
+  })();
+
+  // Animate the "idle" session's duration counter
+  (function () {
+    const el = document.querySelector('.sess.idle .time');
+    if (!el) return;
+    let s = 3 * 60 + 17;
+    setInterval(() => {
+      s += 1;
+      const m = Math.floor(s / 60), ss = s % 60;
+      el.textContent = m + 'm ' + ss.toString().padStart(2, '0') + 's';
+    }, 1000);
+  })();
+
+  // Smooth-scroll for in-page links
+  document.querySelectorAll('a[href^="#"]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      const id = a.getAttribute('href');
+      if (id.length > 1) {
+        const tgt = document.querySelector(id);
+        if (tgt) { e.preventDefault(); tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+    });
+  });
+</script>
+</body>
+</html>
