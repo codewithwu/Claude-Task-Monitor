@@ -1,5 +1,9 @@
 # Claude Task Monitor
 
+[![Open VSX Version](https://img.shields.io/open-vsx/v/codewithwu-cn/claude-task-monitor)](https://open-vsx.org/extension/codewithwu-cn/claude-task-monitor)
+[![GitHub Release](https://img.shields.io/github/v/release/codewithwu/Claude-Task-Monitor)](https://github.com/codewithwu/Claude-Task-Monitor/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 VS Code 扩展：在活动栏侧边栏实时监控本机所有 Claude Code CLI 会话的执行状态。
 
 - 🟢 待命（idle）
