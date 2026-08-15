@@ -53,7 +53,7 @@ Helpers at the top of the file:
 The tests assert **two tiers**:
 
 1. **Behavior that's always true**: dead PIDs get pruned, alive PIDs don't, empty stores don't throw, non-integer PIDs return `false`. These work on any platform.
-2. **Linux-specific behavior**: SIGSTOP'd processes are detected as gone. Gated by `if (procState === 'stopped' || procState === 'tracing_stop') { ... } else { expect at least not killing a live one }` (`src/test/liveness.test.ts:112-124`).
+2. **Linux-specific behavior**: SIGSTOP'd processes are detected as gone. Gated by `if (procState === 'stopped' || procState === 'tracing stop') { ... } else { expect at least not killing a live one }` (`src/test/liveness.test.ts:112-124`).
 
 ### Timeouts
 
