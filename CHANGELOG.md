@@ -7,6 +7,16 @@
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-08-16
+
+### Changed
+
+- **构建配置升级到 `node16` 模块解析**：`tsconfig.json` 把 `module` /
+  `moduleResolution` 从已弃用的 `node` (node10) 升级到 `node16`，消除
+  TS 7.0 计划移除的 deprecation 警告。`src/` 下所有相对 import 加上 `.js`
+  扩展名以符合 Node.js 16+ 解析规则。运行时行为不变（`package.json` 无
+  `"type": "module"`，输出仍为 CJS，`tsup` 配置未变）。
+
 ## [0.1.3] - 2026-08-16
 
 ### Fixed
@@ -84,6 +94,7 @@
 - 新增 `hook.sh` SessionEnd 归档文件名包含 PID 后缀的断言
 - 单元测试总数：75 → 84
 
+[0.1.3]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.3
 [0.1.2]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.2
 [0.1.1]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.1
 [0.1.0]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.0
