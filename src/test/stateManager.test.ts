@@ -271,3 +271,57 @@ describe('SessionStore', () => {
     expect(store.list()).toHaveLength(1)
   })
 })
+
+describe('SessionStore.apply no-op 短路', () => {
+  it('apply(Notification 非 permission_prompt) 不触发 onChange', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'a', cwd: '/p', ts: 1 } as any)
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'Notification', session_id: 'a', notification_type: 'idle_prompt', ts: 2 } as any)
+    expect(count).toBe(0)
+  })
+
+  it('apply(未知 event type) 不触发 onChange', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'a', cwd: '/p', ts: 1 } as any)
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'WeirdEvent' as any, session_id: 'a', ts: 2 })
+    expect(count).toBe(0)
+  })
+
+  it('apply(SessionEnd 未知 session) 不触发 onChange', () => {
+    const store = new SessionStore()
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'SessionEnd', session_id: 'never-existed', ts: 1 } as any)
+    expect(count).toBe(0)
+  })
+
+  it('apply(Notification permission_prompt) 仍触发 onChange', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'a', cwd: '/p', ts: 1 } as any)
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'Notification', session_id: 'a', notification_type: 'permission_prompt', ts: 2 } as any)
+    expect(count).toBe(1)
+  })
+
+  it('apply(SessionStart 创建新 session) 触发 onChange', () => {
+    const store = new SessionStore()
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'new', cwd: '/p', ts: 1 } as any)
+    expect(count).toBe(1)
+  })
+
+  it('apply(SessionEnd 已存在 session) 触发 onChange 一次', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'a', cwd: '/p', ts: 1 } as any)
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'SessionEnd', session_id: 'a', ts: 2 } as any)
+    expect(count).toBe(1)
+  })
+})

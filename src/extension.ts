@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { SessionsWatcher } from './watcher'
 import { SessionStore } from './stateManager'
 import { SessionTreeDataProvider } from './treeDataProvider'
@@ -106,7 +107,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showCollapseAll: false
   })
   const tick = setInterval(() => provider.refresh(), refreshMs)
-  const livenessTick = setInterval(() => pruneDeadSessions(store, SESSIONS_DIR), livenessMs)
+  const livenessTick = setInterval(() => {
+    const { removed, archived } = pruneDeadSessions(store, SESSIONS_DIR)
+    if (removed > 0) {
+      console.log(`[claude-task-monitor] pruned ${removed} dead session(s): ${archived.map(p => path.basename(p)).join(', ')}`)
+    }
+  }, livenessMs)
 
   context.subscriptions.push(
     treeView,
@@ -136,14 +142,14 @@ export async function deactivate(): Promise<void> {
 
 function archiveStaleFiles(sessionsDir: string, endedDir: string, staleHours: number): void {
   const cutoffMs = Date.now() - staleHours * 3600 * 1000
+  fs.mkdirSync(endedDir, { recursive: true })
   for (const name of fs.readdirSync(sessionsDir)) {
     if (!name.endsWith('.jsonl')) continue
     const full = path.join(sessionsDir, name)
     try {
       const stat = fs.statSync(full)
       if (stat.mtimeMs < cutoffMs) {
-        fs.mkdirSync(endedDir, { recursive: true })
-        fs.renameSync(full, path.join(endedDir, `${path.basename(name, '.jsonl')}-${Date.now()}.jsonl`))
+        fs.renameSync(full, path.join(endedDir, `${path.basename(name, '.jsonl')}-${Date.now()}-${randomUUID().slice(0, 8)}.jsonl`))
       }
     } catch {
       // 忽略
@@ -158,22 +164,17 @@ function bootstrapExistingFiles(sessionsDir: string, watcher: SessionsWatcher, s
     const full = path.join(sessionsDir, name)
     try {
       const content = fs.readFileSync(full, 'utf8')
-      let linesProcessed = 0
       for (const line of content.split('\n')) {
         if (!line) continue
         try {
           store.apply(JSON.parse(line) as HookPayload)
-          linesProcessed++
         } catch (e) {
           console.warn(`[claude-task-monitor] bootstrap parse error in ${full}: ${(e as Error).message}`)
         }
       }
       watcher.setOffset(full, Buffer.byteLength(content, 'utf8'))
-      console.log(`[claude-task-monitor] bootstrap: ${name} → ${linesProcessed} events applied`)
     } catch (e) {
       console.warn(`[claude-task-monitor] bootstrap read error for ${full}: ${(e as Error).message}`)
     }
   }
-  const list = store.list()
-  console.log(`[claude-task-monitor] bootstrap done: store has ${list.length} sessions: ${list.map(s => `${s.sessionId.slice(0,8)}=${s.status}`).join(', ')}`)
 }

@@ -30,5 +30,5 @@ echo "$payload" | jq -c --argjson pid "$effective_pid" '. + {ts: now, pid: $pid}
 
 if [ "$event" = "SessionEnd" ]; then
   mkdir -p "$dir/.ended"
-  mv "$dir/$session_id.jsonl" "$dir/.ended/$session_id-$(date +%s).jsonl" 2>/dev/null || true
+  mv "$dir/$session_id.jsonl" "$dir/.ended/$session_id-$(date +%s)-$$.jsonl" 2>/dev/null || true
 fi

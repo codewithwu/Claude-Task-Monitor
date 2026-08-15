@@ -1,9 +1,16 @@
-import { describe, it, expect } from 'vitest'
-import { spawn } from 'node:child_process'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { spawn, execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { SessionStore } from '../stateManager'
+
+// vi.mock 必须放在 import 之前(vitest 会 hoist),mock execFileSync 才能拦截 liveness.ts 里的调用
+vi.mock('node:child_process', async () => {
+  const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process')
+  return { ...actual, execFileSync: vi.fn(actual.execFileSync) }
+})
+
 import { isProcessGone, pruneDeadSessions } from '../liveness'
 
 function spawnLongLived(): Promise<{ child: ReturnType<typeof spawn>; pid: number; kill: () => Promise<void>; stop: () => void; cont: () => void }> {
@@ -146,4 +153,127 @@ describe('liveness e2e', () => {
     await new Promise(r => setTimeout(r, 50))
     await victim.kill()
   }, 10000)
+})
+
+describe('isProcessGone 平台路由', () => {
+  const originalPlatform = process.platform
+
+  beforeEach(() => {
+    vi.mocked(execFileSync).mockReset()
+  })
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  })
+
+  it('win32: wsl.exe ps 解析 stat 首字母为 T → true', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    vi.mocked(execFileSync).mockReturnValue('T' as any)
+    expect(isProcessGone(12345)).toBe(true)
+    expect(execFileSync).toHaveBeenCalledWith('wsl.exe', ['ps', '-p', '12345', '-o', 'stat='], expect.objectContaining({ timeout: 1000 }))
+  })
+
+  it('win32: wsl.exe ps 返回 R → false', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    vi.mocked(execFileSync).mockReturnValue('R' as any)
+    expect(isProcessGone(12345)).toBe(false)
+  })
+
+  it('win32: wsl.exe 抛错降级 tasklist,PID 找不到 → true', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    vi.mocked(execFileSync)
+      .mockImplementationOnce(() => { throw new Error('wsl not found') })
+      .mockImplementationOnce(() => Buffer.from('INFO: No tasks are running which match the specified criteria.'))
+    expect(isProcessGone(12345)).toBe(true)
+    expect(execFileSync).toHaveBeenCalledTimes(2)
+    expect((execFileSync as any).mock.calls[1][0]).toBe('tasklist')
+    expect((execFileSync as any).mock.calls[1][1]).toEqual(['/FI', 'PID eq 12345', '/NH', '/FO', 'CSV'])
+  })
+
+  it('win32: wsl.exe 抛错 + tasklist 抛错 → false(不误杀)', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    vi.mocked(execFileSync).mockImplementation(() => { throw new Error('both failed') })
+    expect(isProcessGone(12345)).toBe(false)
+  })
+
+  it('非整数 pid (NaN, 0, 负数, 小数) 返回 false 不抛错', () => {
+    expect(isProcessGone(NaN)).toBe(false)
+    expect(isProcessGone(0)).toBe(false)
+    expect(isProcessGone(-1)).toBe(false)
+    expect(isProcessGone(1.5)).toBe(false)
+    expect(isProcessGone(undefined as any)).toBe(false)
+    expect(isProcessGone(null as any)).toBe(false)
+  })
+
+  it('linux (当前平台): /proc 可读时直接走 checkViaProc', () => {
+    // 自身进程的 /proc 一定可读,checkViaProc 返回 false
+    expect(isProcessGone(process.pid)).toBe(false)
+  })
+})
+
+describe('pruneDeadSessions mkdirSync 频率', () => {
+  it('N 个死会话都被识别并从 store 移除', () => {
+    const dir = makeTmpSessionsDir()
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'mk1', cwd: '/m', ts: 1, pid: 99_999_991 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'mk2', cwd: '/m', ts: 1, pid: 99_999_992 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'mk3', cwd: '/m', ts: 1, pid: 99_999_993 } as any)
+
+    const { removed } = pruneDeadSessions(store, dir)
+    expect(removed).toBe(3)
+    expect(store.list()).toHaveLength(0)
+
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('有 .jsonl 文件的死会话会被归档到 .ended/', () => {
+    const dir = makeTmpSessionsDir()
+    const store = new SessionStore()
+    // 写对应的 .jsonl 让 archive 分支执行
+    fs.writeFileSync(path.join(dir, 'arc1.jsonl'), '{"hook_event_name":"SessionStart","session_id":"arc1","cwd":"/a","ts":1,"pid":99999981}\n')
+    fs.writeFileSync(path.join(dir, 'arc2.jsonl'), '{"hook_event_name":"SessionStart","session_id":"arc2","cwd":"/a","ts":1,"pid":99999982}\n')
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'arc1', cwd: '/a', ts: 1, pid: 99_999_981 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'arc2', cwd: '/a', ts: 1, pid: 99_999_982 } as any)
+
+    const { removed, archived } = pruneDeadSessions(store, dir)
+    expect(removed).toBe(2)
+    expect(archived).toHaveLength(2)
+    for (const f of archived) expect(fs.existsSync(f)).toBe(true)
+
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('连续两次 pruneDeadSessions 幂等 (mkdirSync 已被提出循环外)', () => {
+    const dir = makeTmpSessionsDir()
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'idem1', cwd: '/i', ts: 1, pid: 99_999_981 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'idem2', cwd: '/i', ts: 1, pid: 99_999_982 } as any)
+
+    const r1 = pruneDeadSessions(store, dir)
+    expect(r1.removed).toBe(2)
+    // 第二次没新死的,不报错、返回 0
+    const r2 = pruneDeadSessions(store, dir)
+    expect(r2.removed).toBe(0)
+    expect(r2.archived).toEqual([])
+
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('pruneDeadSessions 归档名格式', () => {
+  it('归档文件名带时间戳和 8 字符后缀', () => {
+    const dir = makeTmpSessionsDir()
+    const store = new SessionStore()
+    const sessionFile = path.join(dir, 'fmt.jsonl')
+    fs.writeFileSync(sessionFile, '{"hook_event_name":"SessionStart","session_id":"fmt","cwd":"/f","ts":1,"pid":99999990}\n')
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'fmt', cwd: '/f', ts: 1, pid: 99_999_990 } as any)
+
+    const { archived } = pruneDeadSessions(store, dir)
+    expect(archived).toHaveLength(1)
+    // 格式: fmt-<millis>-<8hex>.jsonl
+    expect(path.basename(archived[0])).toMatch(/^fmt-\d{13}-[0-9a-f]{8}\.jsonl$/)
+    expect(fs.existsSync(archived[0])).toBe(true)
+
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
 })

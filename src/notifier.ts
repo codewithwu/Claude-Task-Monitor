@@ -12,8 +12,4 @@ export class Notifier {
     this.lastNotifiedAt.set(sessionId, now)
     this.fn(sessionId, toolName, cwd)
   }
-
-  reset(sessionId: string): void {
-    this.lastNotifiedAt.delete(sessionId)
-  }
 }

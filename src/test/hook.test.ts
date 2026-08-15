@@ -115,3 +115,39 @@ describe('hook.sh PID capture', () => {
     cleanup()
   }, 15000)
 })
+
+function invokeHookDirectly(payload: object): ReturnType<typeof spawn> {
+  const c = spawn('bash', [HOOK_SCRIPT], { stdio: ['pipe', 'inherit', 'inherit'] })
+  c.stdin.write(JSON.stringify(payload))
+  c.stdin.end()
+  return c
+}
+
+describe('hook.sh SessionEnd 归档', () => {
+  it('归档文件名包含 PID 后缀,避免同秒撞名', async () => {
+    const sessionId = uniqueSessionId('hook-archive')
+    const sessionFile = path.join(SESSIONS_DIR, `${sessionId}.jsonl`)
+    const endedDir = path.join(SESSIONS_DIR, '.ended')
+    try { fs.unlinkSync(sessionFile) } catch {}
+    try { fs.readdirSync(endedDir).filter(f => f.startsWith(sessionId)).forEach(f => fs.unlinkSync(path.join(endedDir, f))) } catch {}
+
+    // 先 SessionStart 写 jsonl
+    invokeHookDirectly({ session_id: sessionId, hook_event_name: 'SessionStart', cwd: '/tmp/hook-test' })
+    await sleep(500)
+    expect(fs.existsSync(sessionFile)).toBe(true)
+
+    // 再 SessionEnd 归档
+    invokeHookDirectly({ session_id: sessionId, hook_event_name: 'SessionEnd' })
+    await sleep(500)
+
+    expect(fs.existsSync(sessionFile)).toBe(false)
+    const archived = fs.readdirSync(endedDir).filter(f => f.startsWith(sessionId))
+    expect(archived.length).toBe(1)
+    // 格式: ${sessionId}-<unix-seconds>-<pid>.jsonl
+    expect(archived[0]).toMatch(new RegExp(`^${sessionId}-\\d+-\\d+\\.jsonl$`))
+    // 必须比 sessionId 多一段(PID 后缀),否则同秒撞名
+    expect(archived[0].split('-').length).toBeGreaterThan(sessionId.split('-').length)
+
+    try { fs.unlinkSync(path.join(endedDir, archived[0])) } catch {}
+  }, 10000)
+})

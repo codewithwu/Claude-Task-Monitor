@@ -83,11 +83,17 @@ export class SessionStore {
     const prev = this.sessions.get(event.session_id) ?? null
     const result = reduce(prev, event)
     if (result.kind === 'removed') {
+      // SessionEnd 对未知/已移除 session:no-op,不打扰订阅者
+      // (覆盖 chokidar unlink 跟 pruneDeadSessions 之间的 race)
+      if (prev === null) return
       this.sessions.delete(event.session_id)
-    } else {
+      this.emit()
+    } else if (prev === null || result.state !== prev) {
+      // reduce 对 Notification 非 permission_prompt / 未知 event 返回 prev 本身
+      // (引用相等 = 真 no-op),这种情况跳过 set 和 emit
       this.sessions.set(event.session_id, result.state)
+      this.emit()
     }
-    this.emit()
   }
 
   get(sessionId: string): SessionState | undefined {
