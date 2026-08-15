@@ -3,7 +3,7 @@ import { spawn, execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { SessionStore } from '../stateManager'
+import { SessionStore } from '../stateManager.js'
 
 // vi.mock 必须放在 import 之前(vitest 会 hoist),mock execFileSync 才能拦截 liveness.ts 里的调用
 vi.mock('node:child_process', async () => {
@@ -18,7 +18,7 @@ vi.mock('node:fs', async () => {
   return { ...actual, readFileSync: vi.fn(actual.readFileSync) }
 })
 
-import { isProcessGone, pruneDeadSessions } from '../liveness'
+import { isProcessGone, pruneDeadSessions } from '../liveness.js'
 
 function spawnLongLived(): Promise<{ child: ReturnType<typeof spawn>; pid: number; kill: () => Promise<void>; stop: () => void; cont: () => void }> {
   return new Promise((resolve) => {

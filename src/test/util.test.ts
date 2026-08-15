@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { humanizeDuration } from '../util/time'
+import { humanizeDuration } from '../util/time.js'
 
 describe('humanizeDuration', () => {
   it.each([

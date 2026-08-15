@@ -3,19 +3,19 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { SessionsWatcher } from './watcher'
-import { SessionStore } from './stateManager'
-import { SessionTreeDataProvider } from './treeDataProvider'
-import { Notifier } from './notifier'
-import { pruneDeadSessions } from './liveness'
+import { SessionsWatcher } from './watcher.js'
+import { SessionStore } from './stateManager.js'
+import { SessionTreeDataProvider } from './treeDataProvider.js'
+import { Notifier } from './notifier.js'
+import { pruneDeadSessions } from './liveness.js'
 import {
   writeHookScript,
   mergeSettings,
   uninstallSettings,
   detectJq,
   OWNER_TAG
-} from './installer'
-import type { HookPayload } from './types'
+} from './installer.js'
+import type { HookPayload } from './types.js'
 
 const HOME_DIR = os.homedir()
 const ROOT_DIR = path.join(HOME_DIR, '.claude-task-monitor')

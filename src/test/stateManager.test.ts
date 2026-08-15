@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { reduce } from '../stateManager'
-import type { SessionState, HookPayload } from '../types'
+import { reduce } from '../stateManager.js'
+import type { SessionState, HookPayload } from '../types.js'
 
 const baseTs = 1700000000
 
@@ -192,7 +192,7 @@ describe('reduce', () => {
   })
 })
 
-import { SessionStore } from '../stateManager'
+import { SessionStore } from '../stateManager.js'
 
 describe('SessionStore', () => {
   it('apply SessionStart 后能 list 出该 session', () => {

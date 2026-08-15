@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { writeHookScript, mergeSettings, OWNER_TAG, uninstallSettings, detectJq } from '../installer'
+import { writeHookScript, mergeSettings, OWNER_TAG, uninstallSettings, detectJq } from '../installer.js'
 
 let tmpDir: string
 

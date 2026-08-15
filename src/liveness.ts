@@ -2,7 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import type { SessionStore } from './stateManager'
+import type { SessionStore } from './stateManager.js'
 
 // 判定进程是否已不可用:
 //   1. 不存在 (ESRCH)

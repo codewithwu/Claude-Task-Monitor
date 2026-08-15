@@ -1,8 +1,8 @@
 import * as vscode from 'vscode'
 import * as path from 'node:path'
-import type { SessionState } from './types'
-import type { SessionStore } from './stateManager'
-import { humanizeDuration } from './util/time'
+import type { SessionState } from './types.js'
+import type { SessionStore } from './stateManager.js'
+import { humanizeDuration } from './util/time.js'
 
 const STATUS_ICON: Record<SessionState['status'], { id: string; color: string }> = {
   waiting: { id: 'circle-filled', color: 'charts.red' },

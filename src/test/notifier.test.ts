@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Notifier } from '../notifier'
+import { Notifier } from '../notifier.js'
 
 beforeEach(() => {
   vi.useFakeTimers()

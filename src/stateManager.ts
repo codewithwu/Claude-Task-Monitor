@@ -1,4 +1,4 @@
-import type { HookPayload, ReduceResult, SessionState, SessionStatus } from './types'
+import type { HookPayload, ReduceResult, SessionState, SessionStatus } from './types.js'
 
 const MAX_PROMPT_LEN = 60
 
