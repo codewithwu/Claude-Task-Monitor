@@ -12,4 +12,10 @@ export class Notifier {
     this.lastNotifiedAt.set(sessionId, now)
     this.fn(sessionId, toolName, cwd)
   }
+
+  // 清掉一个 session 的 dedup 记录,防止 Map 永久膨胀
+  // 调用时机:SessionStore 在 SessionEnd / removeByPid 删除 session 时
+  reset(sessionId: string): void {
+    this.lastNotifiedAt.delete(sessionId)
+  }
 }

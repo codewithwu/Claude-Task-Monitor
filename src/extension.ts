@@ -60,8 +60,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   archiveStaleFiles(SESSIONS_DIR, ENDED_DIR, staleHours)
 
-  const store = new SessionStore()
-  const watcher = new SessionsWatcher(SESSIONS_DIR)
+  // notifier 必须先于 store 构造,store 需要拿到 notifier.reset 作为 onSessionRemoved 回调
+  // (SessionEnd / removeByPid 时清掉 dedup Map,防止 Map 永久膨胀)
   const notifier = new Notifier(dedupeSeconds, (sessionId, toolName, cwd) => {
     const name = path.basename(cwd) || cwd
     const msg = `${name} 等待权限确认：${toolName}`
@@ -71,6 +71,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     })
   })
+  const store = new SessionStore((id) => notifier.reset(id))
+  const watcher = new SessionsWatcher(SESSIONS_DIR)
 
   bootstrapExistingFiles(SESSIONS_DIR, watcher, store)
 

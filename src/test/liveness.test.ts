@@ -11,6 +11,13 @@ vi.mock('node:child_process', async () => {
   return { ...actual, execFileSync: vi.fn(actual.execFileSync) }
 })
 
+// 同样 mock node:fs.readFileSync:默认调 actual,但特定测试可 mockReturnValueOnce 注入假 /proc 内容
+// (vi.spyOn 对 node:fs namespace 的 readFileSync 不能 redefine,只能 vi.mock)
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync) }
+})
+
 import { isProcessGone, pruneDeadSessions } from '../liveness'
 
 function spawnLongLived(): Promise<{ child: ReturnType<typeof spawn>; pid: number; kill: () => Promise<void>; stop: () => void; cont: () => void }> {
@@ -177,6 +184,31 @@ describe('isProcessGone 平台路由', () => {
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
     vi.mocked(execFileSync).mockReturnValue('R' as any)
     expect(isProcessGone(12345)).toBe(false)
+  })
+
+  it('win32: wsl.exe ps 小写 t (tracing stop) → true', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    vi.mocked(execFileSync).mockReturnValue('t' as any)
+    expect(isProcessGone(12345)).toBe(true)
+  })
+
+  it('darwin (ps fallback): 小写 t (tracing stop) → true', () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    vi.mocked(execFileSync).mockReturnValue('t' as any)
+    expect(isProcessGone(12345)).toBe(true)
+  })
+
+  it('linux: /proc 状态 `t (tracing stop)` 多词状态名 → true', () => {
+    // gdb/strace attach 时 kernel 写 "State:\tt (tracing stop)"
+    // 旧正则 \w+ 抓不到多词,会漏判这种进程
+    // 用 process.pid 绕过 ESRCH 短路,确保 readFileSync 这条路径真的被走到
+    // (用假 pid 的话 process.kill 抛 ESRCH,checkViaProc 在 readFileSync 之前就返回 true,
+    //  mockReturnValueOnce 不会被消费,会污染下一个测试)
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+    vi.mocked(fs.readFileSync).mockReturnValueOnce(
+      'Name:\tnode\nState:\tt (tracing stop)\nTgid:\t1\nPid:\t1\n' as any
+    )
+    expect(isProcessGone(process.pid)).toBe(true)
   })
 
   it('win32: wsl.exe 抛错降级 tasklist,PID 找不到 → true', () => {

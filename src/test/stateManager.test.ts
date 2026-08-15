@@ -272,6 +272,46 @@ describe('SessionStore', () => {
   })
 })
 
+describe('SessionStore onSessionRemoved 回调', () => {
+  it('SessionEnd 删除已存在 session 时被调用', () => {
+    const removed: string[] = []
+    const store = new SessionStore((id) => removed.push(id))
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    store.apply({ hook_event_name: 'SessionEnd', session_id: 's1', ts: 2 } as any)
+    expect(removed).toEqual(['s1'])
+  })
+
+  it('SessionEnd 对未知 session 不回调 (覆盖 chokidar unlink race)', () => {
+    const removed: string[] = []
+    const store = new SessionStore((id) => removed.push(id))
+    store.apply({ hook_event_name: 'SessionEnd', session_id: 'never-existed', ts: 1 } as any)
+    expect(removed).toEqual([])
+  })
+
+  it('removeByPid 命中时回调', () => {
+    const removed: string[] = []
+    const store = new SessionStore((id) => removed.push(id))
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1, pid: 100 } as any)
+    store.removeByPid(100)
+    expect(removed).toEqual(['s1'])
+  })
+
+  it('removeByPid 没匹配时既不返回也不回调', () => {
+    const removed: string[] = []
+    const store = new SessionStore((id) => removed.push(id))
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1, pid: 100 } as any)
+    expect(store.removeByPid(999)).toBeUndefined()
+    expect(removed).toEqual([])
+  })
+
+  it('回调未提供时删除行为不变 (向后兼容)', () => {
+    const store = new SessionStore()
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    expect(() => store.apply({ hook_event_name: 'SessionEnd', session_id: 's1', ts: 2 } as any)).not.toThrow()
+    expect(store.list()).toHaveLength(0)
+  })
+})
+
 describe('SessionStore.apply no-op 短路', () => {
   it('apply(Notification 非 permission_prompt) 不触发 onChange', () => {
     const store = new SessionStore()
