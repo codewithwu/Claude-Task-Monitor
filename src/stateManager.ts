@@ -79,6 +79,10 @@ export class SessionStore {
   private sessions = new Map<string, SessionState>()
   private listeners: Array<() => void> = []
 
+  // 删除 session 时回调(给 Notifier.reset 等用,避免 dedup Map 永久膨胀)
+  // 注意:apply(removed) 对未知 session 不回调(prev === null 短路),避免对幽灵 session 误触发
+  constructor(private readonly onSessionRemoved?: (sessionId: string) => void) {}
+
   apply(event: HookPayload): void {
     const prev = this.sessions.get(event.session_id) ?? null
     const result = reduce(prev, event)
@@ -87,6 +91,7 @@ export class SessionStore {
       // (覆盖 chokidar unlink 跟 pruneDeadSessions 之间的 race)
       if (prev === null) return
       this.sessions.delete(event.session_id)
+      this.onSessionRemoved?.(event.session_id)
       this.emit()
     } else if (prev === null || result.state !== prev) {
       // reduce 对 Notification 非 permission_prompt / 未知 event 返回 prev 本身
@@ -117,6 +122,7 @@ export class SessionStore {
     for (const [id, s] of this.sessions) {
       if (s.pid !== undefined && s.pid === pid) {
         this.sessions.delete(id)
+        this.onSessionRemoved?.(id)
         this.emit()
         return id
       }

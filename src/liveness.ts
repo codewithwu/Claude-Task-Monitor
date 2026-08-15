@@ -28,6 +28,9 @@ export function isProcessGone(pid: number): boolean {
 }
 
 // Linux/WSL guest: process.kill(pid, 0) 检测 ESRCH;成功则读 /proc 解析 State
+// /proc State 行的格式: `State:\t<T/t/Z/X/...> (<human readable>)`
+// human readable 可能是单词 (running/sleeping/stopped/zombie/dead) 也可能是多词 (tracing stop),
+// 所以只取 state code 首字母判断,跟 ps -o stat= 对齐
 function checkViaProc(pid: number): boolean {
   try {
     process.kill(pid, 0)
@@ -40,10 +43,10 @@ function checkViaProc(pid: number): boolean {
 
   try {
     const status = fs.readFileSync(`/proc/${pid}/status`, 'utf8')
-    const m = status.match(/^State:\s+\S+\s+\((\w+)\)/m)
+    const m = status.match(/^State:\s+(\S)/m)
     if (m) {
-      const state = m[1]
-      return state === 'stopped' || state === 'tracing_stop' || state === 'zombie' || state === 'dead'
+      const c = m[1]
+      return c === 'T' || c === 't' || c === 'Z' || c === 'X'
     }
     return false
   } catch {
@@ -61,7 +64,7 @@ function checkViaPsFallback(pid: number): boolean {
     }).trim()
     if (!out) return true
     const c = out[0]
-    return c === 'T' || c === 'Z' || c === 'X'
+    return c === 'T' || c === 't' || c === 'Z' || c === 'X'
   } catch {
     return false
   }
@@ -77,7 +80,7 @@ function checkViaWslOrTasklist(pid: number): boolean {
     }).trim()
     if (out) {
       const c = out[0]
-      return c === 'T' || c === 'Z' || c === 'X'
+      return c === 'T' || c === 't' || c === 'Z' || c === 'X'
     }
   } catch {
     // wsl.exe 不在 PATH 或调用失败 (没有 WSL / WSL 关闭 / PID 不在 WSL 中),降级 tasklist
