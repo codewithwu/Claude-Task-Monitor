@@ -7,7 +7,44 @@
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-06-08
+## [0.1.2] - 2026-08-16
+
+### Fixed
+
+- **WSL2 会话被误判为已死**：之前在 Windows 上跑扩展时，`process.kill(wslPid, 0)` 会抛
+  `ESRCH`（Windows 进程表查不到 Linux PID），导致 5s 内所有 WSL2 内的 Claude 会话被全部
+  误清空。现改为平台路由：Linux/WSL guest 走 `/proc/${pid}/status`，macOS 走 `ps`，Windows
+  优先 `wsl.exe ps` 查 WSL2 PID，失败再降级到 `tasklist`。
+- **纯 Windows 上死会话永远清不掉**：`/proc` 不存在、`ps` 又不在 PATH 时 catch 块返回
+  `false`，导致 Ctrl+Z / 异常退出的 CLI 永久挂在侧边栏。`tasklist` 路径修复后正确识别。
+- **prune 与 chokidar 抢同一会话的双重刷新**：`pruneDeadSessions` 归档后 `removeByPid` 触发
+  一次 emit，几毫秒后 chokidar 的异步 `unlink` 事件派发合成 `SessionEnd` 又 emit 一次，
+  N 个会话同时死时是一次 UI 重绘风暴。`apply` 现在对未知/已移除 session 的 SessionEnd
+  和 reduce 返回 prev 引用本身（no-op）的 update 不再 emit。
+- **`execSync` 字符串拼接注入风险**：`ps -o stat= -p ${pid}` 改为 `execFileSync('ps', [...])`
+  走数组参数，畸形 PID 不再被 shell 解释。
+- **归档文件名同秒撞名**：`hook.sh` 路径用 `$(date +%s)`、TS 路径用 `Date.now()`，同秒内
+  多次归档会互相覆盖。两边都加了唯一后缀（hook.sh 用 `$$`，TS 用 `randomUUID` 切片）。
+- **prune 循环里 `mkdirSync` 反复 stat**：N 个死会话对应 N 次 mkdir 系统调用。提到循环外。
+- **激活时泄漏 session ID 前缀到 DevTools Console**：删掉两行 `console.log`。
+
+### Changed
+
+- 删除无调用方的 `Notifier.reset` 方法（死代码）。
+
+### Testing
+
+- 新增 platform-routing 单元测试（win32 优先 `wsl.exe` 再 `tasklist`、两者都失败时不误杀）
+- 新增非整数 PID（NaN / 0 / 负数 / 小数）健壮性测试
+- 新增 `apply` no-op 不 emit 的 6 条断言
+- 新增 `pruneDeadSessions` 幂等性测试
+- 新增 `hook.sh` SessionEnd 归档文件名包含 PID 后缀的断言
+- 单元测试总数：75 → 84
+
+[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.2
+[0.1.1]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.1
+[0.1.0]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.0
 
 ### Fixed
 
@@ -51,7 +88,3 @@
 - 集成测试：使用 `@vscode/test-electron` 启动真实 VS Code 实例
 - 端到端活性检测：起真实子进程，覆盖 `kill -9` / SIGSTOP / 正常退出三种路径
 - 单元测试：事件 reducer、SessionStore、installer、watcher 等核心模块
-
-[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.1
-[0.1.0]: https://github.com/codewithwu/Claude-Task-Monitor/releases/tag/v0.1.0

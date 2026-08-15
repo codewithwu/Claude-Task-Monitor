@@ -61,9 +61,9 @@ VS Code 扩展：在活动栏侧边栏实时监控本机所有 Claude Code CLI �
 
 ```bash
 # VS Code
-code --install-extension claude-task-monitor-0.1.1.vsix
+code --install-extension claude-task-monitor-0.1.2.vsix
 # Cursor
-cursor --install-extension claude-task-monitor-0.1.1.vsix
+cursor --install-extension claude-task-monitor-0.1.2.vsix
 ```
 
 ### 从源码构建（开发者）

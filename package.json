@@ -2,7 +2,7 @@
   "name": "claude-task-monitor",
   "displayName": "Claude Task Monitor",
   "description": "Real-time dashboard for local Claude Code CLI sessions",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "codewithwu-cn",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
