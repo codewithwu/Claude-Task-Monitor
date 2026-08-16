@@ -1,0 +1,30 @@
+{
+  "id": "ux-improvements",
+  "name": "ux-improvements",
+  "title": "UX 三件套：waiting 上下文 / onboarding+statusbar / 通知聚合",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "cooper",
+  "assignee": "cooper",
+  "createdAt": "2026-08-16",
+  "completedAt": "2026-08-16",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-16-ux-waiting-context",
+    "08-16-ux-onboarding-statusbar",
+    "08-16-ux-aggregate-notify"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
