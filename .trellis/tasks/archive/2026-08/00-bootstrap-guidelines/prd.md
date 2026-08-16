@@ -21,8 +21,33 @@ the rest conversationally.
 
 ## Status (update the checkboxes as you complete each item)
 
-- [ ] Fill frontend guidelines
+- [x] Fill frontend guidelines   — **N/A: 项目无前端范畴,见下**
 - [ ] Add code examples
+
+---
+
+## 2026-08-16 复查结论:N/A
+
+`trellis init` 生成本任务时假设项目是**前端**项目(React/Vue 等),
+要求填充 `.trellis/spec/frontend/` 下六个文件。但本仓库实际是 **VSCode 扩展后端**,
+无 React/Vue 组件、无页面、无 React hooks、无状态库、无 DOM 渲染,
+所以 `.trellis/spec/frontend/` 子目录根本不存在,也无需创建。
+
+后端规范已在 commit `023a467` (docs(trellis): bootstrap project spec from real codebase)
+基于真实代码填充完毕:
+
+- `.trellis/spec/architecture.md` — 架构分层
+- `.trellis/spec/state.md` — reducer / SessionStore
+- `.trellis/spec/ingest.md` — watcher + hook.sh 数据流
+- `.trellis/spec/lifecycle.md` — activate / deactivate / 配置 / 卸载
+- `.trellis/spec/liveness.md` — 进程活性检测平台路由
+- `.trellis/spec/testing.md` — vitest 单元测试 + @vscode/test-electron 集成测试
+- `.trellis/spec/guides/` — code-reuse / cross-layer thinking guides
+
+新增项目级 SOP 文档已落到仓库根 `VSCODE-EXT-DEV.md` (commit `4ddc5b6`),
+覆盖从项目结构到 Open VSX / GitHub Release 发布的完整流程。
+
+**结论**: 此 bootstrap 任务的 fronted 范畴对本项目不适用,归档即可。
 
 ---
 
