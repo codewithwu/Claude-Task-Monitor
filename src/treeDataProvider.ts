@@ -3,25 +3,23 @@ import * as path from 'node:path'
 import type { SessionState } from './types.js'
 import type { SessionStore } from './stateManager.js'
 import { humanizeDuration } from './util/time.js'
-
-const STATUS_ICON: Record<SessionState['status'], { id: string; color: string }> = {
-  waiting: { id: 'circle-filled', color: 'charts.red' },
-  running: { id: 'circle-filled', color: 'charts.yellow' },
-  idle:    { id: 'circle-filled', color: 'charts.green' }
-}
-
-const STATUS_LABEL: Record<SessionState['status'], string> = {
-  waiting: '等待权限',
-  running: '运行中',
-  idle:    '待命'
-}
+import { renderRowPresentation, statusLabel } from './util/rowPresentation.js'
 
 export class SessionTreeDataProvider implements vscode.TreeDataProvider<SessionState> {
   private _onDidChange = new vscode.EventEmitter<SessionState | undefined>()
   readonly onDidChangeTreeData = this._onDidChange.event
 
+  // bound 一份,这样 offChange 能精确移除同一引用 (this.onStoreChange 每次
+  // 调用会创建新箭头函数,remove 不掉 —— 之前 #8 finding 的根因)
+  private readonly onStoreChange = () => this.refresh()
+
   constructor(private readonly store: SessionStore) {
-    store.onChange(() => this.refresh())
+    store.onChange(this.onStoreChange)
+  }
+
+  dispose(): void {
+    this.store.offChange(this.onStoreChange)
+    this._onDidChange.dispose()
   }
 
   refresh(): void {
@@ -29,11 +27,12 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<SessionS
   }
 
   getTreeItem(s: SessionState): vscode.TreeItem {
-    const item = new vscode.TreeItem(path.basename(s.cwd) || s.cwd, vscode.TreeItemCollapsibleState.None)
-    const icon = STATUS_ICON[s.status]
-    item.iconPath = new vscode.ThemeIcon(icon.id, new vscode.ThemeColor(icon.color))
     const elapsedSec = Math.max(0, Math.floor(Date.now() / 1000) - s.stateChangedAt)
-    item.description = `${STATUS_LABEL[s.status]} · ${humanizeDuration(elapsedSec)}`
+    const row = renderRowPresentation(s, elapsedSec)
+
+    const item = new vscode.TreeItem(row.label, vscode.TreeItemCollapsibleState.None)
+    item.iconPath = new vscode.ThemeIcon(row.iconId, new vscode.ThemeColor(row.iconColor))
+    item.description = row.description
     item.tooltip = this.buildTooltip(s, elapsedSec)
     item.command = {
       command: 'vscode.openFolder',
@@ -50,7 +49,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<SessionS
 
   private buildTooltip(s: SessionState, elapsedSec: number): vscode.MarkdownString {
     const md = new vscode.MarkdownString()
-    md.appendMarkdown(`**${path.basename(s.cwd) || s.cwd}** · ${STATUS_LABEL[s.status]} · ${humanizeDuration(elapsedSec)}\n\n`)
+    md.appendMarkdown(`**${path.basename(s.cwd) || s.cwd}** · ${statusLabel(s.status)} · ${humanizeDuration(elapsedSec)}\n\n`)
     md.appendMarkdown(`\`${s.cwd}\`\n\n`)
     if (s.lastUserPrompt) {
       md.appendMarkdown(`Prompt: ${s.lastUserPrompt}\n\n`)

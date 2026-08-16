@@ -134,6 +134,13 @@ export class SessionStore {
     this.listeners.push(fn)
   }
 
+  // 取消订阅。listener 注册后如果没显式 off,会跟 SessionStore 一起活到进程结束
+  // —— 本身无害,但允许订阅方主动释放 (例如热替换 provider / 测试清理)
+  offChange(fn: () => void): void {
+    const i = this.listeners.indexOf(fn)
+    if (i >= 0) this.listeners.splice(i, 1)
+  }
+
   private emit(): void {
     for (const fn of this.listeners) fn()
   }

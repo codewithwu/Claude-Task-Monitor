@@ -1,12 +1,12 @@
 {
   "name": "claude-task-monitor",
   "displayName": "Claude Task Monitor",
-  "description": "Real-time dashboard for local Claude Code CLI sessions",
-  "version": "0.1.4",
+  "description": "VS Code 侧边栏实时监控本机所有 Claude Code CLI 会话 🟢🟡🔴 —— 红点出现 = 有会话在等你授权,不再切窗口轮询",
+  "version": "0.1.9",
   "publisher": "codewithwu-cn",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
-  "engines": { "vscode": "^1.85.0" },
+  "engines": { "vscode": "^1.86.0" },
   "categories": ["Other"],
   "keywords": [
     "claude-code",
@@ -53,9 +53,70 @@
     "viewsWelcome": [
       {
         "view": "claudeTaskMonitor.sessionsView",
-        "contents": "当前无活跃 Claude Code 会话。\n启动 `claude` 后会自动出现。"
+        "contents": "当前无活跃 Claude Code 会话。\n\n启动 `claude` 后会自动出现。\n\n首次使用？激活时已自动安装 hook 到 ~/.claude/settings.json。\n确认 `jq` 已安装（macOS `brew install jq`，Debian/Ubuntu `apt install jq`）。"
       }
     ],
+    "commands": [
+      {
+        "command": "claudeTaskMonitor.focusSessionsView",
+        "title": "Claude Task Monitor: Focus Sessions View",
+        "category": "Claude Task Monitor"
+      },
+      {
+        "command": "claudeTaskMonitor.copySessionId",
+        "title": "Copy Session ID",
+        "category": "Claude Task Monitor"
+      },
+      {
+        "command": "claudeTaskMonitor.copyAsJson",
+        "title": "Copy Session as JSON",
+        "category": "Claude Task Monitor"
+      },
+      {
+        "command": "claudeTaskMonitor.openInTerminal",
+        "title": "Open in Integrated Terminal",
+        "category": "Claude Task Monitor"
+      },
+      {
+        "command": "claudeTaskMonitor.revealInExplorer",
+        "title": "Reveal in File Explorer",
+        "category": "Claude Task Monitor"
+      },
+      {
+        "command": "claudeTaskMonitor.archiveSession",
+        "title": "Archive Session Now",
+        "category": "Claude Task Monitor"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "claudeTaskMonitor.copySessionId",
+          "when": "view == claudeTaskMonitor.sessionsView",
+          "group": "1_session@1"
+        },
+        {
+          "command": "claudeTaskMonitor.copyAsJson",
+          "when": "view == claudeTaskMonitor.sessionsView",
+          "group": "1_session@2"
+        },
+        {
+          "command": "claudeTaskMonitor.openInTerminal",
+          "when": "view == claudeTaskMonitor.sessionsView",
+          "group": "2_open@1"
+        },
+        {
+          "command": "claudeTaskMonitor.revealInExplorer",
+          "when": "view == claudeTaskMonitor.sessionsView",
+          "group": "2_open@2"
+        },
+        {
+          "command": "claudeTaskMonitor.archiveSession",
+          "when": "view == claudeTaskMonitor.sessionsView",
+          "group": "3_lifecycle@1"
+        }
+      ]
+    },
     "configuration": {
       "title": "Claude Task Monitor",
       "properties": {
@@ -78,6 +139,12 @@
           "type": "number",
           "default": 5000,
           "description": "进程活性检测间隔 (毫秒);用于把 Ctrl+Z / 异常退出的 CLI 从侧边栏移除"
+        },
+        "claudeTaskMonitor.notifyAggregateMode": {
+          "type": "string",
+          "enum": ["perSession", "aggregate"],
+          "default": "aggregate",
+          "description": "等待权限通知模式:perSession 每条会话单独弹(老行为);aggregate N≥2 时合并成一条"
         }
       }
     }

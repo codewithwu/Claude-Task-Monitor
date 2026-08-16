@@ -237,6 +237,36 @@ describe('SessionStore', () => {
     expect(count).toBe(1)
   })
 
+  it('offChange 取消订阅,后续 apply 不再触发该 listener (#8)', () => {
+    const store = new SessionStore()
+    let count = 0
+    const listener = () => { count++ }
+    store.onChange(listener)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    expect(count).toBe(1)
+    store.offChange(listener)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's2', cwd: '/q', ts: 2 } as any)
+    expect(count).toBe(1)  // 未变,listener 已 off
+  })
+
+  it('offChange 未注册的 listener 不抛错', () => {
+    const store = new SessionStore()
+    expect(() => store.offChange(() => {})).not.toThrow()
+  })
+
+  it('offChange 只摘除目标 listener,其他 listener 仍生效', () => {
+    const store = new SessionStore()
+    let a = 0, b = 0
+    const listenerA = () => { a++ }
+    const listenerB = () => { b++ }
+    store.onChange(listenerA)
+    store.onChange(listenerB)
+    store.offChange(listenerA)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    expect(a).toBe(0)
+    expect(b).toBe(1)
+  })
+
   it('对未知 session 的 SessionEnd 不抛错', () => {
     const store = new SessionStore()
     expect(() => store.apply({ hook_event_name: 'SessionEnd', session_id: 'nope', ts: 1 } as any)).not.toThrow()

@@ -7,6 +7,93 @@
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-08-16
+
+### Changed
+
+- **扩展 description 更新**（`package.json`）：从「Real-time dashboard」
+  改为带「设计初心」hook 的版本，突出「红点 = 有会话在等你授权」的核心价值。
+  Open VSX / Marketplace 搜索结果会显示新描述。
+
+## [0.1.8] - 2026-08-16
+
+### Added
+
+- **sidebar 右键菜单**（5 个 action）(`src/extension.ts`, `package.json`)：
+  - 复制 Session ID
+  - 复制为 JSON（便于贴 issue 反馈）
+  - 在集成终端打开（cwd 正确）
+  - 在文件管理器显示
+  - 立即归档（强制 SessionEnd）
+
+## [0.1.7] - 2026-08-16
+
+### Changed (内部清理，无用户可见行为变化)
+
+- **`SessionStore.offChange(fn)`** (`src/stateManager.ts`)：新增取消订阅接口，
+  `SessionTreeDataProvider` 暴露 `dispose()` 并在 `context.subscriptions` 里
+  注册，激活/卸载时释放 EventEmitter + listener。
+- **`statusBar.update` / `applyBadge` 联合去重** (`src/extension.ts`)：
+  之前 `store.onChange` 每次事件（UserPromptSubmit、PreToolUse、PostToolUse
+  等）都重算 badge + status bar —— 但 waiting 集合没变就是浪费。新增
+  `syncWaitingDependentUI()` 用闭包变量跟踪 `lastWaitingCount`，count
+  不变则跳过两个 UI 更新；tick 不再触发 `statusBar.update`。
+- **`installHookAssets` 内容幂等写** (`src/extension.ts`)：序列化后的
+  `settings.json` 与原内容相等则跳过 `writeFileSync`，避免每次激活都
+  touch `~/.claude/settings.json` 的 mtime。
+- **`notifyMessage` 移除未接入的 `displayName` 形参**：之前是预留 hook，
+  仅测试用过；接入场景未发生，先删掉避免误用。
+
+## [0.1.6] - 2026-08-16
+
+### Fixed
+
+- **未装 jq 的用户不再被「hook 已安装」误导** (`src/extension.ts`,
+  `src/ui/onboarding.ts`)：`detectJq()` 返回 false 时**跳过**自动
+  `installHookAssets`，避免写入依赖 jq 的 hook.sh 后静默失败。同时把
+  onboarding 的「复制 brew/apt 命令」按钮从 `'install'` 路径改回 `'copy'`，
+  不再触发误导性的「hook 已安装」toast；只复制命令让用户自己去终端跑。
+- **Windows 路径的 `Edit` / `Write` 行 label** (`src/util/toolSummary.ts`,
+  `src/util/notifyMessage.ts`)：之前本地 `basename()` 只 split `/`，原生
+  Windows Claude Code 发的 `C:\Users\me\src\auth.ts` 会整段塞进 label
+  撑爆 60 字符预算。改用 `path.posix.basename(p.replace(/\\/g, '/'))`，
+  POSIX 和 Windows 路径都正确。
+- **`renderRowPresentation` 的死参数** (`src/util/rowPresentation.ts`)：
+  删掉 `nowSec` 形参和函数内部对 `Date.now()` 的重算 —— 信任 caller 传入
+  的 `elapsedSec`（与 `treeDataProvider` tooltip 共用同一份计算），避免
+  双源时间漂移。
+
+## [0.1.5] - 2026-08-16
+
+### Added
+
+- **waiting 行余光可读「等什么 + 等多久」** (`src/util/rowPresentation.ts`,
+  `src/util/toolSummary.ts`)：sidebar waiting 行的 description 现在插入
+  `tool_name`，label 拼接 `toolSummary`（如 `git push --force · my-project`）。
+  Bash 命令 / Edit 文件路径 / WebFetch URL 自动归一化到人类可读短串，长命令
+  截断到 60 字符。waiting 持续 ≥ 5 分钟时，icon 从 `circle-filled` 升级为
+  `alert` + 主题色换 `errorForeground`，视觉拉满。
+- **首次激活 onboarding** (`src/ui/onboarding.ts`)：扩展首次激活用
+  `globalState.ctm.onboardingShown`（MachineScope）做幂等标记，弹一次三步
+  引导卡片（安装 hook → 启动 claude → 看红点），含「安装 hook」/「跳过」
+  按钮。`jq` 缺失分支自动改文案为引导装 jq，附「复制 brew/apt 命令」按钮。
+- **status bar 实时 waiting 数** (`src/ui/statusBar.ts`,
+  `src/util/statusBarContent.ts`)：右下角常驻 `$(pulse) CTM`，waiting ≥ 1
+  时变为 `$(pulse) CTM: W⚠`。点击 reveal sessionsView。sidebar 折叠时也不
+  丢存在感。
+- **通知聚合** (`src/notifier.ts`, `src/util/notifyMessage.ts`)：多会话并行
+  时不再刷屏 —— N=1 沿用旧单条体感，N≥2 合并成一条 `N 个会话正在等待：
+  name1, name2, ... 等 N 个`。新增配置 `claudeTaskMonitor.notifyAggregateMode`
+  (`perSession` / `aggregate`，默认 `aggregate`)。
+- **sidebar 图标徽标** (`src/ui/badge.ts`)：waiting ≥ 1 时图标右上角显示
+  数字徽标，离开屏幕回来也能秒看到还有几个会话在等。
+
+### Changed
+
+- **engines.vscode 升级到 `^1.86.0`**：`TreeView<T>.badge` API 需要 VS Code
+  1.86+。锁在 1.85 的用户升级到此版本会被 VS Code 拒绝安装；VS Code 1.86
+  已发布 18 个月，基线用户应都已升级。
+
 ## [0.1.4] - 2026-08-16
 
 ### Changed
