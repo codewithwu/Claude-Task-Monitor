@@ -1,0 +1,30 @@
+{
+  "id": "ux-backlog-v2",
+  "name": "ux-backlog-v2",
+  "title": "Backlog v2: 右键菜单 + 一键批准 + Marketplace 上架",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "cooper",
+  "assignee": "cooper",
+  "createdAt": "2026-08-16",
+  "completedAt": "2026-08-16",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-16-ux-context-menu",
+    "08-16-ux-one-click-approve",
+    "08-16-release-marketplace"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
