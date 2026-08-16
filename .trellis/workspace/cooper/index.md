@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 1
+- **Total Sessions**: 2
 - **Last Active**: 2026-08-16
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~42 | Active |
+| `journal-1.md` | ~83 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 2 | 2026-08-16 | 0.1.5 → 0.1.9: UX 三件套 + /code-review 修复 + 右键菜单 + Open VSX 发布 | `4580916` | `main` |
 | 1 | 2026-08-16 | 提炼 CTM 开发经验为 VSCode 扩展 SOP | `4ddc5b6` | `main` |
 <!-- @@@/auto:session-history -->
 

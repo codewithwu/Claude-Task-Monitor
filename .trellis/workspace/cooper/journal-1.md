@@ -40,3 +40,44 @@
 ### Next Steps
 
 - 后续开新扩展时直接复制 VSCODE-EXT-DEV.md 结构,按附录 A 的最小骨架起项目
+
+
+## Session 2: 0.1.5 → 0.1.9: UX 三件套 + /code-review 修复 + 右键菜单 + Open VSX 发布
+
+**Date**: 2026-08-16
+**Task**: 0.1.5 → 0.1.9: UX 三件套 + /code-review 修复 + 右键菜单 + Open VSX 发布
+**Branch**: `main`
+
+### Summary
+
+本会话完成 Claude Task Monitor 0.1.5 → 0.1.9 五个版本的端到端发版:
+- 0.1.5: UX 三件套 (waiting 行余光可读 + 首次激活 onboarding + status bar + 通知聚合 + sidebar 徽标)
+- 0.1.6: /code-review HIGH 修复 (jq gating + Windows 路径 basename + 死参数 + duplicate basename)
+- 0.1.7: 内部清理 (SessionStore.offChange + applyBadge dedup + installHookAssets 幂等写)
+- 0.1.8: sidebar 右键菜单 (5 个 action)
+- 0.1.9: package.json description 更新 + 发布到 Open VSX (待用户激活)
+
+技术亮点:
+- 抽出 renderRowPresentation 纯函数便于测试 (elapsedSec caller-computed, 删 nowSec)
+- 统一 node:path.posix.basename 处理 Windows \ + POSIX / 跨平台路径
+- jq 检测失败时跳过 hook 安装,避免误导性 success toast
+- waiting-count 闭包去重,避免每个 hook 事件无差别重渲染 UI
+- SessionStore.offChange + treeDataProvider.dispose 配套,listener 可释放
+- installHookAssets JSON 字符串对比,内容相同则跳过 writeFileSync
+
+测试: 119 → 142 cases (+23, 含 Windows \ 路径 + aggregate + dedup + offChange)
+
+未做的 backlog 项:
+- VS Code Marketplace 发布 (用户决定优先 Open VSX,Marketplace 留 backlog)
+- 一键批准 (技术边界 + 安全权衡,留 backlog)
+- Marketplace CI 自动发布 (独立 backlog)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4580916` | (see git log) |
+
+### Status
+
+[OK] **Completed**
