@@ -89,7 +89,7 @@
     "test:watch": "vitest",
     "build:integration": "tsc -p tsconfig.integration.json",
     "test:integration": "pnpm build && pnpm build:integration && node ./dist-test/runTest.js",
-    "package": "vsce package --no-dependencies",
+    "package": "vsce package --no-dependencies && mkdir -p packages && mv *.vsix packages/",
     "vscode:prepublish": "pnpm build"
   },
   "dependencies": {
