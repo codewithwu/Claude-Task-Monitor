@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude Task Monitor — 个人作品介绍</title>
+  <meta name="description" content="Claude Task Monitor 是一个 VS Code 扩展，在活动栏侧边栏实时监控本机所有 Claude Code CLI 会话的执行状态。" />
+  <style>
+    /* ---------- Reset & tokens ---------- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:            #0d1117;
+      --bg-elevated:   #161b22;
+      --bg-overlay:    #1c2128;
+      --border:        #30363d;
+      --border-strong: #444c56;
+      --fg:            #c9d1d9;
+      --fg-dim:        #8b949e;
+      --fg-mute:       #6e7681;
+      --accent:        #ffa657;
+      --accent-soft:   rgba(255, 166, 87, 0.14);
+      --accent-strong: rgba(255, 166, 87, 0.32);
+      --green:         #3fb950;
+      --green-soft:    rgba(63, 185, 80, 0.18);
+      --yellow:        #d29922;
+      --yellow-soft:   rgba(210, 153, 34, 0.18);
+      --red:           #f85149;
+      --red-soft:      rgba(248, 81, 73, 0.18);
+      --purple:        #a371f7;
+
+      --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace,
+              SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei',
+              'Segoe UI', Roboto, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--mono);
+      font-size: 15px;
+      line-height: 1.65;
+      min-height: 100vh;
+      padding: 2.5rem 1.5rem;
+      background-image:
+        radial-gradient(circle at 20% 0%, rgba(255,166,87,0.04), transparent 40%),
+        radial-gradient(circle at 80% 100%, rgba(163,113,247,0.04), transparent 40%);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ---------- Window chrome ---------- */
+    .window {
+      max-width: 980px;
+      margin: 0 auto;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--bg-overlay);
+      border-bottom: 1px solid var(--border);
+    }
+    .titlebar .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+    .titlebar .path {
+      margin-left: 0.75rem;
+      color: var(--fg-mute);
+      font-size: 0.82rem;
+      font-family: var(--mono);
+    }
+    .titlebar .path b { color: var(--fg-dim); font-weight: 500; }
+
+    .body {
+      padding: 2.5rem clamp(1.25rem, 4vw, 3rem);
+    }
+
+    /* ---------- Hero ---------- */
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.72rem;
+      color: var(--fg-dim);
+      background: var(--bg-overlay);
+    }
+    .badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--fg-mute);
+    }
+    .badge-license::before  { background: var(--accent); }
+    .badge-vsx::before      { background: var(--purple); }
+    .badge-version::before  { background: var(--green); }
+
+    h1 {
+      font-family: var(--mono);
+      font-size: clamp(1.8rem, 4.5vw, 2.6rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+      margin-bottom: 0.6rem;
+    }
+    h1 .prompt {
+      color: var(--accent);
+      user-select: none;
+    }
+    h1 .cursor {
+      display: inline-block;
+      width: 0.55ch;
+      height: 1em;
+      background: var(--accent);
+      vertical-align: text-bottom;
+      animation: blink 1.05s steps(2) infinite;
+      margin-left: 0.15ch;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .tagline {
+      color: var(--fg-dim);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+    .tagline::before { content: '// '; color: var(--fg-mute); }
+
+    .lede {
+      font-family: var(--sans);
+      font-size: 1.05rem;
+      color: var(--fg);
+      max-width: 60ch;
+      margin-bottom: 2rem;
+    }
+
+    /* ---------- CTA ---------- */
+    .cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 3rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.6rem 1.1rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-overlay);
+      color: var(--fg);
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      transition: border-color 120ms, background 120ms, transform 120ms;
+    }
+    .btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      text-decoration: none;
+      transform: translateY(-1px);
+    }
+    .btn-primary {
+      background: var(--accent-soft);
+      border-color: var(--accent-strong);
+      color: var(--accent);
+    }
+    .btn .arrow { color: var(--accent); }
+
+    /* ---------- Section ---------- */
+    section { margin-bottom: 3rem; }
+
+    h2 {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    h2::before {
+      content: '##';
+      color: var(--fg-mute);
+      font-weight: 500;
+    }
+
+    .prose {
+      font-family: var(--sans);
+      font-size: 1rem;
+      color: var(--fg);
+      max-width: 68ch;
+    }
+    .prose p { margin-bottom: 0.9rem; }
+    .prose em { color: var(--accent); font-style: normal; }
+
+    /* ---------- Story contrast ---------- */
+    .story {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    @media (min-width: 760px) {
+      .story { grid-template-columns: 1.1fr 1fr; gap: 1.5rem; }
+    }
+    .story-card {
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--red);
+      border-radius: 6px;
+      padding: 1.1rem 1.25rem;
+    }
+    .story-card.ok { border-left-color: var(--green); }
+
+    .story-card .label {
+      font-size: 0.72rem;
+      color: var(--fg-mute);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.04em;
+    }
+    .story-card .label.bad::before  { content: '✗ '; color: var(--red); }
+    .story-card .label.ok::before   { content: '✓ '; color: var(--green); }
+
+    .terminal-block {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--fg-dim);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.9rem 1rem;
+      white-space: pre-wrap;
+      line-height: 1.55;
+    }
+    .terminal-block .l { color: var(--accent); }
+    .terminal-block .g { color: var(--green); }
+    .terminal-block .r { color: var(--red); }
+    .terminal-block .y { color: var(--yellow); }
+    .terminal-block .d { color: var(--fg-mute); }
+
+    /* ---------- Status badges ---------- */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .status-card {
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .status-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.08;
+    }
+    .status-card.green::after  { background: radial-gradient(circle at 100% 0%, var(--green), transparent 60%); }
+    .status-card.yellow::after { background: radial-gradient(circle at 100% 0%, var(--yellow), transparent 60%); }
+    .status-card.red::after    { background: radial-gradient(circle at 100% 0%, var(--red), transparent 60%); }
+
+    .status-card .led {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .status-card .led::before {
+      content: '';
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px transparent;
+    }
+    .status-card.green .led::before  { background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+    .status-card.yellow .led::before { background: var(--yellow); box-shadow: 0 0 0 4px var(--yellow-soft); animation: pulse 1.6s ease-in-out infinite; }
+    .status-card.red .led::before    { background: var(--red); box-shadow: 0 0 0 4px var(--red-soft); animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.18); }
+    }
+
+    .status-card .name { color: var(--fg); }
+    .status-card .name-en {
+      font-family: var(--mono);
+      color: var(--fg-dim);
+      font-size: 0.78rem;
+      margin-left: 0.4rem;
+    }
+    .status-card .desc {
+      font-family: var(--sans);
+      color: var(--fg);
+      font-size: 0.92rem;
+      margin-top: 0.3rem;
+    }
+
+    /* ---------- Sidebar mock ---------- */
+    .sidebar-mock {
+      margin-top: 1.5rem;
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.5rem;
+      max-width: 360px;
+    }
+    .sidebar-mock .head {
+      padding: 0.4rem 0.7rem;
+      color: var(--fg-mute);
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.4rem;
+    }
+    .session {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0.7rem;
+      border-radius: 4px;
+      font-size: 0.82rem;
+      color: var(--fg);
+    }
+    .session + .session { margin-top: 2px; }
+    .session.red    { background: rgba(248,81,73,0.10); border-left: 2px solid var(--red); }
+    .session.yellow { background: rgba(210,153,34,0.10); border-left: 2px solid var(--yellow); }
+    .session.green  { background: rgba(63,185,80,0.10);  border-left: 2px solid var(--green); }
+
+    .session .led {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .session.red .led    { background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .session.yellow .led { background: var(--yellow); }
+    .session.green .led  { background: var(--green); }
+
+    .session .proj { color: var(--fg); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .session .dur  { color: var(--fg-mute); font-size: 0.72rem; }
+
+    /* ---------- Architecture ---------- */
+    .arch {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 760px) {
+      .arch { grid-template-columns: repeat(3, 1fr); }
+    }
+    .arch-step {
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      position: relative;
+    }
+    .arch-step .idx {
+      color: var(--accent);
+      font-size: 0.72rem;
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.04em;
+    }
+    .arch-step h3 {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      color: var(--fg);
+      margin-bottom: 0.4rem;
+    }
+    .arch-step p {
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      color: var(--fg-dim);
+    }
+    .arch-step code {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    .arch-step::after {
+      content: '→';
+      position: absolute;
+      right: -0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent);
+      font-size: 1.1rem;
+    }
+    .arch-step:last-child::after { display: none; }
+    @media (max-width: 759px) {
+      .arch-step::after {
+        content: '↓';
+        right: 50%;
+        top: auto;
+        bottom: -1.05rem;
+        transform: translateX(50%);
+      }
+    }
+
+    /* ---------- Install ---------- */
+    .install-tabs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .install-card {
+      background: var(--bg-overlay);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+    .install-card h3 {
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      color: var(--accent);
+      margin-bottom: 0.4rem;
+    }
+    .install-card p {
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      color: var(--fg-dim);
+      margin-bottom: 0.7rem;
+    }
+
+    /* ---------- Footer ---------- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+      margin-top: 1rem;
+      color: var(--fg-mute);
+      font-size: 0.82rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: center;
+    }
+    footer .links { display: flex; gap: 1rem; flex-wrap: wrap; }
+    footer a { color: var(--fg-dim); }
+    footer a:hover { color: var(--accent); }
+
+    /* ---------- Misc ---------- */
+    .mono-comment { color: var(--fg-mute); }
+    .hr { border: 0; border-top: 1px dashed var(--border); margin: 2.5rem 0; }
+    .ascii {
+      font-family: var(--mono);
+      color: var(--fg-dim);
+      font-size: 0.78rem;
+      line-height: 1.3;
+      white-space: pre;
+      overflow-x: auto;
+      margin: 1rem 0 0;
+    }
+    .ascii .a { color: var(--accent); }
+    .ascii .g { color: var(--green); }
+    .ascii .y { color: var(--yellow); }
+    .ascii .r { color: var(--red); }
+  </style>
+</head>
+<body>
+
+  <div class="window">
+    <!-- ▸ Window chrome -->
+    <div class="titlebar">
+      <span class="dot dot-r"></span>
+      <span class="dot dot-y"></span>
+      <span class="dot dot-g"></span>
+      <span class="path">~/<b>projects</b>/claude-task-monitor <span style="color:var(--green)">★</span> showcase.md</span>
+    </div>
+
+    <div class="body">
+
+      <!-- ▸ Hero -->
+      <header>
+        <div class="meta-row">
+          <span class="badge badge-version">v0.1.4</span>
+          <span class="badge badge-license">MIT License</span>
+          <span class="badge badge-vsx">Open VSX · VS Code Extension</span>
+        </div>
+
+        <h1>
+          <span class="prompt">$</span> claude-task-monitor<span class="cursor"></span>
+        </h1>
+        <p class="tagline">Real-time dashboard for local Claude Code CLI sessions</p>
+
+        <p class="lede">
+          把本地每一个 <code style="color:var(--accent);font-family:var(--mono);">claude</code> 进程的执行状态，
+          以三种颜色的徽标实时投射到 VS Code 侧边栏——
+          你不需要切窗口、不需要 <code style="color:var(--accent);font-family:var(--mono);">tmux switch</code>、
+          不需要 <code style="color:var(--accent);font-family:var(--mono);">ls ~/.claude/projects/</code>。
+          余光里看到一颗红点，就知道那边有个任务正在等你。
+        </p>
+
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/codewithwu/Claude-Task-Monitor">
+            <span class="arrow">→</span> GitHub Repository
+          </a>
+          <a class="btn" href="https://github.com/codewithwu/Claude-Task-Monitor/releases">
+            <span class="arrow">↓</span> Releases (.vsix)
+          </a>
+          <a class="btn" href="https://open-vsx.org/extension/codewithwu-cn/claude-task-monitor">
+            <span class="arrow">⊕</span> Open VSX
+          </a>
+        </div>
+
+        <pre class="ascii"><span class="a">●</span> claude-task-monitor
+<span class="g">●</span> <span class="y">●</span> <span class="r">●</span>  idle · running · waiting</pre>
+      </header>
+
+      <hr class="hr" />
+
+      <!-- ▸ 设计初心 -->
+      <section>
+        <h2>设计初心 · 多终端静默等待的痛点</h2>
+
+        <div class="story">
+          <div class="prose">
+            <p>
+              用 Claude Code 干活，<em>并行是常态</em>：一个终端在改 API，一个在跑数据迁移，
+              一个在重构旧模块。你的屏幕前同时跑着 3～5 个 <code style="color:var(--accent);font-family:var(--mono);">claude</code> 进程。
+            </p>
+            <p>
+              问题在于：<em>你的注意力一次只能在一个窗口里</em>。当 A 任务正在刷出长长的日志，
+              B 任务在某个 <code style="color:var(--accent);font-family:var(--mono);">rm -rf</code>
+              或者 <code style="color:var(--accent);font-family:var(--mono);">git push --force</code>
+              之前停下来等你点确认——
+              你<strong style="color:var(--red)">完全没看见</strong>。
+            </p>
+            <p>
+              它不会失败，不会报错，不会自动重试，只是安静地挂在那里，等你什么时候想起来切回去。
+            </p>
+            <p>
+              等你切回去的时候，已经过去十分钟、二十分钟、半小时。
+              一段本该是<em>人机协作</em>的工作流，被迫降级成了<em>轮询</em>。
+            </p>
+            <p style="color:var(--accent)">
+              <strong>Claude Task Monitor 就是为了消除这种「背后的等待」而生的。</strong>
+            </p>
+          </div>
+
+          <div>
+            <div class="story-card" style="margin-bottom:0.9rem">
+              <div class="label bad">没有 monitor 时</div>
+              <div class="terminal-block"><span class="d"># 切回窗口 B</span>
+<span class="r">[15:32] claude></span> rm -rf node_modules/
+<span class="r">[15:32] claude></span> <span class="y">Allow this dangerous command?</span>
+<span class="d">[等待 28 分钟]</span>
+<span class="d">[15:32 → 16:00]</span> ←  <span class="r">你已经晚点了</span></div>
+            </div>
+            <div class="story-card ok">
+              <div class="label ok">装上 monitor 后</div>
+              <div class="terminal-block"><span class="d"># 侧边栏自动亮起红点</span>
+<span class="r">●</span> ~/projects/api-refactor  <span class="r">waiting · 4s</span>
+
+<span class="d"># 点一下跳过去</span>
+<span class="g">[15:32:04]</span> confirmed.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="hr" />
+
+      <!-- ▸ 功能演示 -->
+      <section>
+        <h2>功能演示 · 三态徽标</h2>
+
+        <p class="prose" style="margin-bottom:1.25rem">
+          会话状态以三种颜色实时投影在活动栏侧边栏，每个会话一行，包含项目路径和已等待时长。
+        </p>
+
+        <div class="status-grid">
+          <div class="status-card green">
+            <div class="led"><span class="name">🟢 待命</span><span class="name-en">idle</span></div>
+            <p class="desc">CLI 已连接但无任务执行；随时可以被唤醒。</p>
+          </div>
+          <div class="status-card yellow">
+            <div class="led"><span class="name">🟡 运行中</span><span class="name-en">running</span></div>
+            <p class="desc">正在调工具、写文件、跑命令——无需打扰，让它跑完。</p>
+          </div>
+          <div class="status-card red">
+            <div class="led"><span class="name">🔴 等待确认</span><span class="name-en">waiting</span></div>
+            <p class="desc">工具调用前停下来等权限；触发桌面通知 + 侧边栏跳过去。</p>
+          </div>
+        </div>
+
+        <!-- 模拟侧边栏 -->
+        <div class="sidebar-mock">
+          <div class="head">Claude Task Monitor · Sessions</div>
+
+          <div class="session red">
+            <span class="led"></span>
+            <span class="proj">~/work/api-refactor</span>
+            <span class="dur">4s</span>
+          </div>
+          <div class="session yellow">
+            <span class="led"></span>
+            <span class="proj">~/work/data-migration</span>
+            <span class="dur">2m 17s</span>
+          </div>
+          <div class="session yellow">
+            <span class="led"></span>
+            <span class="proj">~/work/legacy-cleanup</span>
+            <span class="dur">11m 03s</span>
+          </div>
+          <div class="session green">
+            <span class="led"></span>
+            <span class="proj">~/playground/llm-bench</span>
+            <span class="dur">—</span>
+          </div>
+        </div>
+
+        <p class="prose" style="margin-top:1.25rem;margin-bottom:0">
+          点击 <span style="color:var(--red)">🔴</span> 行会直接唤起对应项目所在 VS Code 窗口；
+          没有就新开一个。<strong style="color:var(--red)">🔴 永远排在最前</strong>，
+          同色按状态时间倒序——你永远先看到「需要你做决定」的那一个。
+        </p>
+      </section>
+
+      <hr class="hr" />
+
+      <!-- ▸ 技术架构 -->
+      <section>
+        <h2>技术架构 · 从 hook 到侧边栏</h2>
+
+        <div class="arch">
+          <div class="arch-step">
+            <div class="idx">STEP 01</div>
+            <h3>Claude CLI 触发 hook</h3>
+            <p>扩展激活时把 <code>~/.claude-task-monitor/hook.sh</code> 合并进 <code>~/.claude/settings.json</code>，
+               每次 <code>PreToolUse</code> / <code>Notification</code> 都会执行一次。</p>
+          </div>
+          <div class="arch-step">
+            <div class="idx">STEP 02</div>
+            <h3>写 session 文件</h3>
+            <p>hook 用 <code>jq</code> 把会话 ID / 状态 / cwd 写入
+               <code>~/.claude-task-monitor/sessions/&lt;id&gt;.json</code>。</p>
+          </div>
+          <div class="arch-step">
+            <div class="idx">STEP 03</div>
+            <h3>侧边栏实时呈现</h3>
+            <p><code>chokidar</code> 监听目录变化 + <code>comm=claude</code> 进程活性检测，
+               Webview 把状态渲染成上面你看到的三色徽标。</p>
+          </div>
+        </div>
+
+        <div class="terminal-block" style="margin-top:1.25rem"><span class="d"># ~/.claude/settings.json（扩展注入的 hooks 块）</span>
+{
+  <span class="y">"hooks"</span>: {
+    <span class="g">"PreToolUse"</span>: [
+      { <span class="y">"hooks"</span>: [
+        { <span class="g">"type"</span>: <span class="r">"command"</span>,
+          <span class="g">"command"</span>: <span class="r">"~/.claude-task-monitor/hook.sh"</span> }
+      ]}
+    ],
+    <span class="g">"Notification"</span>: [ <span class="d">/* ... */</span> ]
+  }
+}</div>
+      </section>
+
+      <hr class="hr" />
+
+      <!-- ▸ 安装 -->
+      <section>
+        <h2>安装 · 三种姿势</h2>
+
+        <div class="install-tabs">
+          <div class="install-card">
+            <h3>VSCodium / Code-OSS / Gitpod</h3>
+            <p>默认走 Open VSX。打开扩展面板搜 <code style="color:var(--accent);font-family:var(--mono);">claude-task-monitor</code>，点 Install。</p>
+            <div class="terminal-block"><span class="g">$</span> <span class="l">open</span> Extensions
+<span class="d">→</span> search: claude-task-monitor
+<span class="d">→</span> <span class="r">Install</span></div>
+          </div>
+
+          <div class="install-card">
+            <h3>VS Code / Cursor / Windsurf</h3>
+            <p>从 Releases 下载 <code style="color:var(--accent);font-family:var(--mono);">.vsix</code>，
+               用 <em>"Extensions: Install from VSIX"</em> 命令安装。</p>
+            <div class="terminal-block"><span class="g">$</span> code --install-extension \
+    <span class="r">claude-task-monitor-0.1.4.vsix</span></div>
+          </div>
+
+          <div class="install-card">
+            <h3>从源码构建</h3>
+            <p>开发者本地调试路径。需要 <code style="color:var(--accent);font-family:var(--mono);">pnpm</code>。</p>
+            <div class="terminal-block"><span class="g">$</span> pnpm install
+<span class="g">$</span> pnpm build
+<span class="g">$</span> pnpm package
+<span class="g">$</span> code --extensionDevelopmentPath=<span class="r">$(pwd)</span></div>
+          </div>
+        </div>
+
+        <p class="mono-comment" style="margin-top:1rem;font-size:0.85rem">
+          # 系统依赖：VS Code ≥ 1.85 · Claude Code CLI · jq · bash
+        </p>
+      </section>
+
+      <hr class="hr" />
+
+      <!-- ▸ Footer -->
+      <footer>
+        <div>cooper · 个人项目作品 · 2026</div>
+        <div class="links">
+          <a href="https://github.com/codewithwu/Claude-Task-Monitor">GitHub</a>
+          <a href="https://github.com/codewithwu/Claude-Task-Monitor/issues">Issues</a>
+          <a href="https://github.com/codewithwu/Claude-Task-Monitor/releases">Releases</a>
+          <a href="https://open-vsx.org/extension/codewithwu-cn/claude-task-monitor">Open VSX</a>
+        </div>
+      </footer>
+
+    </div><!-- /.body -->
+  </div><!-- /.window -->
+
+</body>
+</html>
