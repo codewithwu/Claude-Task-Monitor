@@ -24,5 +24,6 @@
   "command.copyJqInstallCommand.title": "Copy jq Install Command",
   "command.setFilter.title": "Set View Filter (All / Waiting / Running / Idle)",
   "command.openDocs.title": "Open Documentation",
+  "command.toggleLanguage.title": "Switch UI Language (Auto / 中文 / English)",
   "welcome.content": "## Don't see your Claude sessions?\n\nStart `claude` in a terminal and they'll appear automatically — first sidebar refresh may take 1-2 seconds.\n\n### Still nothing? Try these:\n\n[Install hook](command:claudeTaskMonitor.installHook) · [Show onboarding](command:claudeTaskMonitor.showOnboarding)\n\n[Settings](command:workbench.action.openSettings,[\"claudeTaskMonitor\"]) · [Open documentation](command:claudeTaskMonitor.openDocs)\n\n> Tip: confirm `jq` is installed (macOS `brew install jq` / Debian-Ubuntu `apt install jq`). When missing, a red banner appears at the top of the sidebar."
 }

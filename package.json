@@ -165,6 +165,11 @@
         "command": "claudeTaskMonitor.openDocs",
         "title": "%command.openDocs.title%",
         "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.toggleLanguage",
+        "title": "%command.toggleLanguage.title%",
+        "category": "%category%"
       }
     ],
     "menus": {
@@ -262,6 +267,12 @@
           "default": 300,
           "minimum": 30,
           "description": "waiting 状态超过该秒数视为长等,图标升级为 alert + errorForeground"
+        },
+        "claudeTaskMonitor.language": {
+          "type": "string",
+          "enum": ["auto", "zh", "en"],
+          "default": "auto",
+          "description": "UI 语言:auto 跟随 VS Code display language;zh/en 强制覆盖扩展内的动态文案 (status bar / sidebar / toast / notification)。Command Palette 与视图标题仍由 VS Code display language 决定,改本设置不会切换它们。"
         }
       }
     }

@@ -22,9 +22,11 @@ import { FILTER_MODES, isFilterMode } from './types.js'
 import { StatusBar, FOCUS_SESSIONS_VIEW_COMMAND } from './ui/statusBar.js'
 import { maybeShowOnboarding, showOnboardingCards } from './ui/onboarding.js'
 import { MutedStore } from './util/muted.js'
-import { t } from './i18n/index.js'
+import { LangStore, type LangPref } from './util/langStore.js'
+import { t, setLangOverride } from './i18n/index.js'
 import { applyBadge } from './ui/badge.js'
 import { formatSingleMessage, formatAggregateMessage } from './util/notifyMessage.js'
+import { LangToggle } from './ui/langToggle.js'
 
 const HOME_DIR = os.homedir()
 const ROOT_DIR = path.join(HOME_DIR, '.claude-task-monitor')
@@ -69,6 +71,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // 长等阈值 (waiting 行 icon 升级为 alert 的临界值)。从 cfg 读,默认 300 秒。
   // cfg 修改通过 onDidChangeConfiguration 监听器热更新 —— 见下方 register。
   const longWaitingThresholdSec = cfg.get<number>('longWaitingThresholdSec', 300)
+
+  // UI 语言偏好 (08-23 ui-lang-toggle):从 cfg 读初值,设入 i18n override
+  // 让所有 t() 立即生效。必须早于任何 t() 调用 (applyJqBanner / statusBar.update /
+  // applyBadge 等),放此处 (config 读取块末尾) 是最安全的位置。
+  const langPref = cfg.get<LangPref>('language', 'auto')
+  const langStore = new LangStore(langPref)
+  setLangOverride(langStore.currentLang())
 
   fs.mkdirSync(SESSIONS_DIR, { recursive: true })
   fs.mkdirSync(ENDED_DIR, { recursive: true })
@@ -173,6 +182,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // status bar:右下角常驻,反映 waiting 数 (R2)
   const statusBar = new StatusBar()
   statusBar.update(store)
+
+  // 语言切换按钮 (08-23 ui-lang-toggle):独立 StatusBarItem,priority 99 紧邻 CTM。
+  // 文本/tooltip 由 LangToggle 内部读 LangStore 计算。
+  const langToggle = new LangToggle(() => langStore.get())
 
   // 注册 reveal sidebar 命令 (status bar / 通知点击都触发)
   const focusCommand = vscode.commands.registerCommand(FOCUS_SESSIONS_VIEW_COMMAND, () => {
@@ -300,6 +313,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     provider.refresh()
   })
 
+  // 语言切换按钮 (08-23 ui-lang-toggle):Command Palette + status bar 入口共用。
+  // cycle() 写 config → 触发 onDidChangeConfiguration 监听器 → 刷 UI。
+  const toggleLanguageCommand = vscode.commands.registerCommand('claudeTaskMonitor.toggleLanguage', () => langStore.cycle())
+
   // store 变化时同步刷新 status bar 文案 + sidebar 徽标。
 // 用 waitingCount 闭包变量去重,避免 UserPromptSubmit / PreToolUse /
   // PostToolUse 等不影响 waiting 集合的事件触发无意义的 UI 更新 (#7)。
@@ -350,13 +367,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showOnboardingCommand,
     copyJqInstallCommand,
     setFilterCommand,
+    toggleLanguageCommand,
+    langStore,
+    langToggle,
     // cfg 热更新:用户改 longWaitingThresholdSec 后立即生效,无需 reload window。
     // 监听器返回的 Disposable 直接 push 进 subscriptions,dispose 时自动解绑。
     vscode.workspace.onDidChangeConfiguration(e => {
-      if (!e.affectsConfiguration('claudeTaskMonitor.longWaitingThresholdSec')) return
-      const newSec = vscode.workspace.getConfiguration('claudeTaskMonitor')
-        .get<number>('longWaitingThresholdSec', 300)
-      provider.setLongWaitThreshold(newSec)
+      // 长等阈值热更新 (沿用既有 #6 fix 模式)
+      if (e.affectsConfiguration('claudeTaskMonitor.longWaitingThresholdSec')) {
+        const newSec = vscode.workspace.getConfiguration('claudeTaskMonitor')
+          .get<number>('longWaitingThresholdSec', 300)
+        provider.setLongWaitThreshold(newSec)
+      }
+      // 语言切换 (08-23 ui-lang-toggle):sync 重读 → override → 全套 UI 重画。
+      // 包括 statusBar / badge tooltip / tree description / 按钮自身,
+      // 新弹的 notification / toast / quickPick 自动用新语言 (它们是事件触发的)。
+      if (e.affectsConfiguration('claudeTaskMonitor.language')) {
+        langStore.syncFromConfig()
+        setLangOverride(langStore.currentLang())
+        statusBar.update(store)
+        applyBadge(treeView, store)
+        provider.refresh()
+        langToggle.render()
+      }
     }),
     statusBar,
     { dispose: () => clearInterval(tick) },

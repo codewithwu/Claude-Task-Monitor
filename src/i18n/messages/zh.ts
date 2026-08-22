@@ -61,5 +61,13 @@ export const zh: Record<string, string> = {
   // ─── jq install command (label only) ───
   'jqInstall.darwin': 'brew install jq',
   'jqInstall.linux': 'sudo apt install jq',
-  'jqInstall.win32': 'winget install jqlang.jq'
+  'jqInstall.win32': 'winget install jqlang.jq',
+
+  // ─── lang toggle status bar (08-23 ui-lang-toggle) ───
+  // 短文本图标 (A/中/EN) 写在 LangToggle.ts,这里只放状态名 + tooltip 模板。
+  // {0} = 当前状态名, {1} = 下次点击会切到的状态名
+  'lang.toggle.state.auto': '自动',
+  'lang.toggle.state.zh': '中文',
+  'lang.toggle.state.en': '英文',
+  'lang.toggle.tooltip': '界面语言: {0}\n点击切换到 {1}\n命令面板名称跟随 VS Code display language'
 }

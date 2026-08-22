@@ -10,13 +10,19 @@
 //   - 其他 → 英文 (默认 fallback)
 //   - 缺失 key → 返回 key 本身,console.warn 一次 (避免 typo 默默走 fallback)
 //
+// 手动覆盖 (08-23 ui-lang-toggle):
+//   - setLangOverride(lang) 写入模块级 override,detectLang() 优先返回它
+//   - LangStore.set() 在配置变化时调 setLangOverride,让所有 t() 立即生效
+//   - 设为 undefined 回落到 vscode.env.language (auto 模式)
+//
 // 占位符:
 //   - 使用 {0} {1} ... 形式,跟 vscode.l10n 对齐
 //   - 调用: t('xxx', arg0, arg1) → 自动替换
 //
 // 测试隔离:
-//   - `t(key, ...args, lang?)` 接受可选 lang 参数,默认从 vscode.env.language 读
-//   - 测试时显式传 lang,避免引入 vscode 模块依赖
+//   - `t(key, ...args, lang?)` 接受可选 lang 参数,默认走 detectLang (override 优先)
+//   - 测试时显式传 lang,跳过 detectLang
+//   - 测试覆盖 override 后必须 setLangOverride(undefined) 重置 (见 i18n.test.ts afterEach)
 
 import * as vscode from 'vscode'
 
@@ -25,7 +31,16 @@ import { zh } from './messages/zh.js'
 
 export type Lang = 'zh' | 'en'
 
+// 模块级手动覆盖:LangStore 在 set/cycle 时写入,让所有 t() 立即跟随。
+// undefined = 未覆盖,回落到 vscode.env.language。
+let override: Lang | undefined
+
+export function setLangOverride(lang: Lang | undefined): void {
+  override = lang
+}
+
 export function detectLang(): Lang {
+  if (override) return override
   return vscode.env.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
 
