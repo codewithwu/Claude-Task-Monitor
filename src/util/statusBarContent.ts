@@ -50,6 +50,6 @@ export function formatWaitingTooltip(
   if (n <= topN) {
     return t('status.tooltip.waitingMany', n, itemsStr)
   }
-  // 等 N 个:N 是总数,沿用旧行为 (旧实现 `等 ${n} 个`)
-  return t('status.tooltip.waitingManyTruncated', n, itemsStr, n)
+  // 等 N 个:N 是被截断的实际数量 (n - topN),即"还有多少没列出来"
+  return t('status.tooltip.waitingManyTruncated', n, itemsStr, n - topN)
 }

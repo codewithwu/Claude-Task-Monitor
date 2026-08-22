@@ -79,7 +79,7 @@ describe('formatWaitingTooltip', () => {
       makeWaiting('d', '/p/d', NOW - 30)
     ]
     const out = formatWaitingTooltip(sessions, NOW)
-    expect(out).toBe('4 个等待权限：a 30s, b 30s, c 30s 等 4 个')
+    expect(out).toBe('4 个等待权限：a 30s, b 30s, c 30s 等 1 个')
   })
 
   it('cwd 是根路径时 fallback 到 cwd 字符串', () => {
@@ -94,6 +94,6 @@ describe('formatWaitingTooltip', () => {
       makeWaiting('c', '/p/c', NOW - 30)
     ]
     const out = formatWaitingTooltip(sessions, NOW, 2)
-    expect(out).toBe('3 个等待权限：a 30s, b 30s 等 3 个')
+    expect(out).toBe('3 个等待权限：a 30s, b 30s 等 1 个')
   })
 })

@@ -54,7 +54,7 @@ describe('formatAggregateMessage', () => {
       s('d', 'Bash', '/p/four'),
       s('e', 'Bash', '/p/five')
     ])
-    expect(msg).toBe('5 个会话正在等待：one, two, three 等 5 个')
+    expect(msg).toBe('5 个会话正在等待：one, two, three 等 2 个')
   })
 
   it('Windows 路径(用 \\ 分隔)正确取 basename', () => {

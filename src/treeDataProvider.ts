@@ -21,9 +21,16 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeElem
   constructor(
     private readonly store: SessionStore,
     private readonly getFilter: () => FilterMode = () => 'all',
-    private readonly longWaitThresholdSec: number = 300
+    private longWaitThresholdSec: number = 300
   ) {
     store.onChange(this.onStoreChange)
+  }
+
+  // cfg 热更新入口:cfg.onDidChangeConfiguration 监听器改值后调用,
+  // 同时 refresh() 让所有可见 waiting 行用新阈值重渲染。
+  setLongWaitThreshold(sec: number): void {
+    this.longWaitThresholdSec = sec
+    this.refresh()
   }
 
   dispose(): void {

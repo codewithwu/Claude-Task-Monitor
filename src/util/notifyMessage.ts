@@ -16,15 +16,15 @@ export function formatSingleMessage(s: WaitingSession): string {
 // 聚合通知文案:
 //   - 1 个:不调用此函数(走 formatSingleMessage)
 //   - 2~3 个:列出全部
-//   - ≥4 个:列前 MAX_NAMES_IN_AGGREGATE 个 + "等 N 个" (N 是总数,沿用旧行为 ——
-//     旧实现是 `等 ${n} 个` 不管剩余几个,保持一致避免破坏用户既有认知)
+//   - ≥4 个:列前 MAX_NAMES_IN_AGGREGATE 个 + "等 N 个" (N 是被截断的实际数量,
+//     即 n - MAX_NAMES_IN_AGGREGATE —— "还有多少没列出来")
 export function formatAggregateMessage(sessions: ReadonlyArray<WaitingSession>): string {
   const names = sessions.slice(0, MAX_NAMES_IN_AGGREGATE).map(s => displayNameOf(s.cwd))
   const n = sessions.length
   if (n <= MAX_NAMES_IN_AGGREGATE) {
     return t('notify.aggregate.short', n, names.join(', '))
   }
-  return t('notify.aggregate.long', n, names.join(', '), n)
+  return t('notify.aggregate.long', n, names.join(', '), n - MAX_NAMES_IN_AGGREGATE)
 }
 
 // 跨平台 cwd basename:把 \ 归一为 / 再用 posix.basename,

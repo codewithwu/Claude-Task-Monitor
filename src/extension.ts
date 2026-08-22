@@ -64,11 +64,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const cfgDefaultFilter = cfg.get<string>('defaultFilter', 'all')
   const initialFilter: FilterMode = isFilterMode(cfgDefaultFilter) ? cfgDefaultFilter : 'all'
   const savedFilter = context.workspaceState.get<string>(FILTER_KEY, initialFilter)
-  const currentFilter: FilterMode = isFilterMode(savedFilter) ? savedFilter : initialFilter
-  let activeFilter: FilterMode = currentFilter
+  let activeFilter: FilterMode = isFilterMode(savedFilter) ? savedFilter : initialFilter
 
   // 长等阈值 (waiting 行 icon 升级为 alert 的临界值)。从 cfg 读,默认 300 秒。
-  // 注入到 treeDataProvider,每行 render 时用最新值 —— cfg 修改无需重启。
+  // cfg 修改通过 onDidChangeConfiguration 监听器热更新 —— 见下方 register。
   const longWaitingThresholdSec = cfg.get<number>('longWaitingThresholdSec', 300)
 
   fs.mkdirSync(SESSIONS_DIR, { recursive: true })
@@ -103,8 +102,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // all 模式或单条:每条单独弹
       for (const s of sessions) {
         const msg = formatSingleMessage(s)
-        void vscode.window.showWarningMessage(msg, '打开项目').then(action => {
-          if (action === '打开项目') {
+        const openProjectLabel = t('notify.action.openProject')
+        void vscode.window.showWarningMessage(msg, openProjectLabel).then(action => {
+          if (action === openProjectLabel) {
             void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(s.cwd), { forceNewWindow: false })
           }
         })
@@ -113,8 +113,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     // aggregate 模式 + 多 waiting:弹一条聚合,点击 reveal sidebar
     const msg = formatAggregateMessage(sessions)
-    void vscode.window.showWarningMessage(msg, '查看侧边栏').then(action => {
-      if (action === '查看侧边栏') {
+    const viewSidebarLabel = t('notify.action.viewSidebar')
+    void vscode.window.showWarningMessage(msg, viewSidebarLabel).then(action => {
+      if (action === viewSidebarLabel) {
         void vscode.commands.executeCommand(FOCUS_SESSIONS_VIEW_COMMAND)
       }
     })
@@ -349,6 +350,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     showOnboardingCommand,
     copyJqInstallCommand,
     setFilterCommand,
+    // cfg 热更新:用户改 longWaitingThresholdSec 后立即生效,无需 reload window。
+    // 监听器返回的 Disposable 直接 push 进 subscriptions,dispose 时自动解绑。
+    vscode.workspace.onDidChangeConfiguration(e => {
+      if (!e.affectsConfiguration('claudeTaskMonitor.longWaitingThresholdSec')) return
+      const newSec = vscode.workspace.getConfiguration('claudeTaskMonitor')
+        .get<number>('longWaitingThresholdSec', 300)
+      provider.setLongWaitThreshold(newSec)
+    }),
     statusBar,
     { dispose: () => clearInterval(tick) },
     { dispose: () => clearInterval(livenessTick) },
