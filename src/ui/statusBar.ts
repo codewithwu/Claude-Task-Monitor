@@ -7,10 +7,11 @@
 // 渲染规则 (与父 design.md §4 / D2 对齐):
 //   N=0       → $(pulse) CTM
 //   waiting≥1 → $(pulse) CTM: W⚠
+//   waiting 时 tooltip 列前 3 个 waiting 项目名 + 时长,多于 3 个用 "等 N 个" 收尾
 
 import * as vscode from 'vscode'
 import type { SessionStore } from '../stateManager.js'
-import { computeStatusBarContent } from '../util/statusBarContent.js'
+import { computeStatusBarContent, formatWaitingTooltip } from '../util/statusBarContent.js'
 
 export const FOCUS_SESSIONS_VIEW_COMMAND = 'claudeTaskMonitor.focusSessionsView'
 
@@ -29,9 +30,15 @@ export class StatusBar {
   }
 
   update(store: SessionStore): void {
-    const content = computeStatusBarContent(store.list())
+    const sessions = store.list()
+    const content = computeStatusBarContent(sessions)
     this.item.text = content.text
-    this.item.tooltip = content.tooltip
+    // 有 waiting 时 tooltip 升级为 top-3 项目列表,让用户不展开 sidebar 也能定位
+    const waiting = sessions.filter(s => s.status === 'waiting')
+    const tooltip = waiting.length > 0
+      ? formatWaitingTooltip(waiting)
+      : content.tooltip
+    this.item.tooltip = tooltip
   }
 
   dispose(): void {

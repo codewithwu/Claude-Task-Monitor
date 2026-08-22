@@ -1,13 +1,22 @@
 {
   "name": "claude-task-monitor",
-  "displayName": "Claude Task Monitor",
-  "description": "VS Code 侧边栏实时监控本机所有 Claude Code CLI 会话 🟢🟡🔴 —— 红点出现 = 有会话在等你授权,不再切窗口轮询",
+  "displayName": "%extension.displayName%",
+  "description": "%extension.description%",
   "version": "0.1.9",
   "publisher": "codewithwu-cn",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
   "engines": { "vscode": "^1.86.0" },
   "categories": ["Other"],
+  "keybindings": [
+    {
+      "command": "claudeTaskMonitor.focusSessionsView",
+      "key": "shift+cmd+c",
+      "mac": "shift+cmd+c",
+      "win": "shift+ctrl+c",
+      "linux": "shift+ctrl+c"
+    }
+  ],
   "keywords": [
     "claude-code",
     "claude",
@@ -53,39 +62,109 @@
     "viewsWelcome": [
       {
         "view": "claudeTaskMonitor.sessionsView",
-        "contents": "当前无活跃 Claude Code 会话。\n\n启动 `claude` 后会自动出现。\n\n首次使用？激活时已自动安装 hook 到 ~/.claude/settings.json。\n确认 `jq` 已安装（macOS `brew install jq`，Debian/Ubuntu `apt install jq`）。"
+        "contents": "## 没有看到你的 Claude 会话?\n\n启动 `claude` 后会自动出现 —— sidebar 第一次刷新可能需要 1-2 秒。\n\n### 还没显示?试试这些:\n\n[安装 hook](command:claudeTaskMonitor.installHook) · [查看 onboarding](command:claudeTaskMonitor.showOnboarding)\n\n[设置](command:workbench.action.openSettings,[\"claudeTaskMonitor\"]) · [打开文档](command:claudeTaskMonitor.openDocs)\n\n> 提示:确认 `jq` 已安装 (macOS `brew install jq` / Debian-Ubuntu `apt install jq`)。缺失时 sidebar 顶部会有红色提示。"
       }
     ],
     "commands": [
       {
         "command": "claudeTaskMonitor.focusSessionsView",
-        "title": "Claude Task Monitor: Focus Sessions View",
-        "category": "Claude Task Monitor"
+        "title": "%command.focusSessionsView.title%",
+        "category": "%category%"
       },
       {
         "command": "claudeTaskMonitor.copySessionId",
-        "title": "Copy Session ID",
-        "category": "Claude Task Monitor"
+        "title": "%command.copySessionId.title%",
+        "category": "%category%"
       },
       {
         "command": "claudeTaskMonitor.copyAsJson",
-        "title": "Copy Session as JSON",
-        "category": "Claude Task Monitor"
+        "title": "%command.copyAsJson.title%",
+        "category": "%category%"
       },
       {
         "command": "claudeTaskMonitor.openInTerminal",
-        "title": "Open in Integrated Terminal",
-        "category": "Claude Task Monitor"
+        "title": "%command.openInTerminal.title%",
+        "category": "%category%"
       },
       {
         "command": "claudeTaskMonitor.revealInExplorer",
-        "title": "Reveal in File Explorer",
-        "category": "Claude Task Monitor"
+        "title": "%command.revealInExplorer.title%",
+        "category": "%category%"
       },
       {
         "command": "claudeTaskMonitor.archiveSession",
-        "title": "Archive Session Now",
-        "category": "Claude Task Monitor"
+        "title": "%command.archiveSession.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.openInCurrentWindow",
+        "title": "%command.openInCurrentWindow.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.toggleMute",
+        "title": "%command.toggleMute.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.viewSessionFile",
+        "title": "%command.viewSessionFile.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.togglePin",
+        "title": "%command.togglePin.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.copySessionIdOnSelected",
+        "title": "%command.copySessionIdOnSelected.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.copyAsJsonOnSelected",
+        "title": "%command.copyAsJsonOnSelected.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.openInTerminalOnSelected",
+        "title": "%command.openInTerminalOnSelected.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.revealInExplorerOnSelected",
+        "title": "%command.revealInExplorerOnSelected.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.archiveSessionOnSelected",
+        "title": "%command.archiveSessionOnSelected.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.installHook",
+        "title": "%command.installHook.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.showOnboarding",
+        "title": "%command.showOnboarding.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.copyJqInstallCommand",
+        "title": "%command.copyJqInstallCommand.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.setFilter",
+        "title": "%command.setFilter.title%",
+        "category": "%category%"
+      },
+      {
+        "command": "claudeTaskMonitor.openDocs",
+        "title": "%command.openDocs.title%",
+        "category": "%category%"
       }
     ],
     "menus": {
@@ -114,11 +193,31 @@
           "command": "claudeTaskMonitor.archiveSession",
           "when": "view == claudeTaskMonitor.sessionsView",
           "group": "3_lifecycle@1"
+        },
+        {
+          "command": "claudeTaskMonitor.openInCurrentWindow",
+          "when": "view == claudeTaskMonitor.sessionsView",
+          "group": "2_open@3"
+        },
+        {
+          "command": "claudeTaskMonitor.toggleMute",
+          "when": "view == claudeTaskMonitor.sessionsView && (viewItem =~ /^session-(waiting|running|idle)$/ || viewItem =~ /^session-(waiting|running|idle)-muted$/)",
+          "group": "3_lifecycle@2"
+        },
+        {
+          "command": "claudeTaskMonitor.viewSessionFile",
+          "when": "view == claudeTaskMonitor.sessionsView && (viewItem =~ /^session-(waiting|running|idle)/ || viewItem =~ /^group-/)",
+          "group": "1_session@3"
+        },
+        {
+          "command": "claudeTaskMonitor.togglePin",
+          "when": "view == claudeTaskMonitor.sessionsView && (viewItem =~ /^session-(waiting|running|idle)/ || viewItem =~ /^session-(waiting|running|idle)-muted/)",
+          "group": "3_lifecycle@3"
         }
       ]
     },
     "configuration": {
-      "title": "Claude Task Monitor",
+      "title": "%category%",
       "properties": {
         "claudeTaskMonitor.staleHours": {
           "type": "number",
@@ -142,9 +241,27 @@
         },
         "claudeTaskMonitor.notifyAggregateMode": {
           "type": "string",
-          "enum": ["perSession", "aggregate"],
+          "enum": ["perSession", "aggregate", "silent"],
           "default": "aggregate",
-          "description": "等待权限通知模式:perSession 每条会话单独弹(老行为);aggregate N≥2 时合并成一条"
+          "description": "等待权限通知模式:perSession 每条会话单独弹(老行为);aggregate N≥2 时合并成一条;silent 不弹通知,仅 status bar/badge 更新"
+        },
+        "claudeTaskMonitor.notifyMode": {
+          "type": "string",
+          "enum": ["all", "aggregate", "silent"],
+          "default": "aggregate",
+          "description": "等待权限通知模式(替代 notifyAggregateMode):all 每条单独弹;aggregate N≥2 时合并;silent 不弹通知"
+        },
+        "claudeTaskMonitor.defaultFilter": {
+          "type": "string",
+          "enum": ["all", "waiting", "running", "idle"],
+          "default": "all",
+          "description": "侧边栏默认过滤模式;workspaceState 保存的用户选择优先"
+        },
+        "claudeTaskMonitor.longWaitingThresholdSec": {
+          "type": "number",
+          "default": 300,
+          "minimum": 30,
+          "description": "waiting 状态超过该秒数视为长等,图标升级为 alert + errorForeground"
         }
       }
     }

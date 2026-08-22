@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { formatSingleMessage, formatAggregateMessage } from '../util/notifyMessage.js'
 import type { WaitingSession } from '../notifier.js'
+
+// notifyMessage 走 i18n,i18n 内部 import vscode.
+// vi.mock 占位让模块解析通过;language 设为 'zh-cn' 跟既有断言对齐 (测试期望中文文案)
+vi.mock('vscode', () => ({ env: { language: 'zh-cn' } }))
 
 function s(sessionId: string, toolName: string, cwd: string): WaitingSession {
   return { sessionId, toolName, cwd }

@@ -60,7 +60,7 @@ describe('renderRowPresentation', () => {
     expect(row.iconColor).toBe('charts.red')
   })
 
-  it('running 行:不展示 tool_name,label 仅 projectName', () => {
+  it('running 行:不展示 tool_name,label 仅 projectName;icon 是 sync~spin (旋转动画)', () => {
     const s = makeSession({
       status: 'running',
       currentTool: { name: 'Bash', input: { command: 'ls' } }  // running 也会有 currentTool,但不暴露
@@ -68,10 +68,11 @@ describe('renderRowPresentation', () => {
     const row = renderRowPresentation(s, 3)
     expect(row.label).toBe('my-app')
     expect(row.description).toBe('运行中 · 3s')
+    expect(row.iconId).toBe('sync~spin')        // 形状 + 动画 双编码区别于 waiting/idle
     expect(row.iconColor).toBe('charts.yellow')
   })
 
-  it('idle 行:不展示 tool_name', () => {
+  it('idle 行:icon 是 circle-outline (区别于 waiting/running 的填充形态)', () => {
     const s = makeSession({
       status: 'idle',
       currentTool: null
@@ -79,6 +80,7 @@ describe('renderRowPresentation', () => {
     const row = renderRowPresentation(s, 60)
     expect(row.label).toBe('my-app')
     expect(row.description).toBe('待命 · 1m')
+    expect(row.iconId).toBe('circle-outline')
     expect(row.iconColor).toBe('charts.green')
   })
 
@@ -107,5 +109,38 @@ describe('renderRowPresentation', () => {
     // 函数负责 max(0, ...) —— 这是函数唯一处理 elapsed 的地方
     const row = renderRowPresentation(s, -100)
     expect(row.description).toBe('运行中 · 0s')
+  })
+
+  it('自定义 longWaitThreshold:用更小的阈值 (60s) 时,wating 61s 就升级为 alert', () => {
+    const s = makeSession({
+      status: 'waiting',
+      currentTool: { name: 'Bash', input: { command: 'ls' } }
+    })
+    const row = renderRowPresentation(s, 61, 60)
+    expect(row.iconId).toBe('alert')
+    expect(row.iconColor).toBe('errorForeground')
+  })
+
+  it('自定义 longWaitThreshold:同 elapsed 但默认阈值 (300s) 下仍是 circle-filled', () => {
+    const s = makeSession({
+      status: 'waiting',
+      currentTool: { name: 'Bash', input: { command: 'ls' } }
+    })
+    const row = renderRowPresentation(s, 61, 300)
+    expect(row.iconId).toBe('circle-filled')
+  })
+
+  it('dyingAt 有值:icon 改 circle-slash + descriptionForeground,description 加 "已退出" 前缀', () => {
+    const s = makeSession({
+      status: 'running',
+      currentTool: { name: 'Bash', input: { command: 'npm test' } }
+    })
+    const dying = { ...s, dyingAt: Math.floor(Date.now() / 1000) }
+    const row = renderRowPresentation(dying, 30)
+    expect(row.iconId).toBe('circle-slash')
+    expect(row.iconColor).toBe('descriptionForeground')
+    expect(row.description.startsWith('已退出 · ')).toBe(true)
+    // dying 时不暴露 currentTool (跟现有规则一致:wait 之外不暴露)
+    expect(row.label).toBe('my-app')  // 没拼 toolSummary
   })
 })

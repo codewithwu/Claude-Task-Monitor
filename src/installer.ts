@@ -86,3 +86,16 @@ export function detectJq(): Promise<boolean> {
     proc.on('exit', code => resolve(code === 0))
   })
 }
+
+// 按当前 process.platform 返回对应的 jq 安装命令。
+// 用于 onboarding 缺失分支 / treeView banner 的"复制安装命令"按钮。
+// 注意:Linux 这里只覆盖 apt 系(Debian/Ubuntu),其他发行版需用户自行替换;
+// macOS / Windows 用户按此命令装好即可。
+export function getJqInstallCommand(): string {
+  const platform = process.platform
+  if (platform === 'darwin') return 'brew install jq'
+  if (platform === 'linux') return 'sudo apt install jq'
+  if (platform === 'win32') return 'winget install jqlang.jq'
+  // fallback:用 brew 命令(Unix-like)
+  return 'brew install jq'
+}

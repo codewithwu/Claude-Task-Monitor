@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { writeHookScript, mergeSettings, OWNER_TAG, uninstallSettings, detectJq } from '../installer.js'
+import { writeHookScript, mergeSettings, OWNER_TAG, uninstallSettings, detectJq, getJqInstallCommand } from '../installer.js'
 
 let tmpDir: string
 
@@ -128,5 +128,39 @@ describe('detectJq', () => {
   it('当前环境检测返回 boolean', async () => {
     const result = await detectJq()
     expect(typeof result).toBe('boolean')
+  })
+})
+
+describe('getJqInstallCommand', () => {
+  // 桩 process.platform,确保三个分支都被覆盖,而不只是当前 OS。
+  const originalPlatform = process.platform
+  function setPlatform(p: NodeJS.Platform): void {
+    Object.defineProperty(process, 'platform', { value: p })
+  }
+
+  afterEach(() => {
+    setPlatform(originalPlatform)
+  })
+
+  it('darwin → brew install jq', () => {
+    setPlatform('darwin')
+    expect(getJqInstallCommand()).toBe('brew install jq')
+  })
+
+  it('linux → sudo apt install jq', () => {
+    setPlatform('linux')
+    expect(getJqInstallCommand()).toBe('sudo apt install jq')
+  })
+
+  it('win32 → winget install jqlang.jq', () => {
+    setPlatform('win32')
+    expect(getJqInstallCommand()).toBe('winget install jqlang.jq')
+  })
+
+  it('unknown platform → brew fallback (非空字符串)', () => {
+    setPlatform('freebsd' as NodeJS.Platform)
+    const cmd = getJqInstallCommand()
+    expect(typeof cmd).toBe('string')
+    expect(cmd.length).toBeGreaterThan(0)
   })
 })

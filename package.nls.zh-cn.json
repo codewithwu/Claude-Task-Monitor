@@ -1,0 +1,27 @@
+{
+  "extension.displayName": "Claude Task Monitor (Claude 任务监控)",
+  "extension.description": "VS Code 侧边栏实时监控本机所有 Claude Code CLI 会话 🟢🟡🔴 —— 红点出现 = 有会话在等你授权,不再切窗口轮询",
+
+  "category": "Claude Task Monitor",
+
+  "command.focusSessionsView.title": "Claude Task Monitor: 聚焦 Sessions 视图",
+  "command.copySessionId.title": "复制 Session ID",
+  "command.copyAsJson.title": "复制 Session JSON",
+  "command.openInTerminal.title": "在集成终端中打开",
+  "command.revealInExplorer.title": "在文件管理器中显示",
+  "command.archiveSession.title": "立即归档 Session",
+  "command.openInCurrentWindow.title": "在当前窗口中打开",
+  "command.toggleMute.title": "切换通知 (静音 / 恢复)",
+  "command.viewSessionFile.title": "查看 Session 文件",
+  "command.togglePin.title": "切换置顶 (Pin",
+  "command.copySessionIdOnSelected.title": "复制 Session ID (选中项)",
+  "command.copyAsJsonOnSelected.title": "复制 Session JSON (选中项)",
+  "command.openInTerminalOnSelected.title": "在集成终端中打开 (选中项)",
+  "command.revealInExplorerOnSelected.title": "在文件管理器中显示 (选中项)",
+  "command.archiveSessionOnSelected.title": "立即归档 Session (选中项)",
+  "command.installHook.title": "安装 / 重装 Hook",
+  "command.showOnboarding.title": "查看 onboarding",
+  "command.copyJqInstallCommand.title": "复制 jq 安装命令",
+  "command.setFilter.title": "设置视图过滤 (全部 / 等待 / 运行 / 待命)",
+  "command.openDocs.title": "打开文档"
+}

@@ -222,6 +222,36 @@ describe('SessionStore', () => {
     expect(ids).toEqual(['waiting', 'running', 'idle-new', 'idle-old'])
   })
 
+  it('pinned 会话跨 group 置顶', () => {
+    const store = new SessionStore()
+    // waiting 在前,idle 在后(STATUS_PRIORITY)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'idle-1', cwd: '/a', ts: 100 } as any)
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'waiting-1', cwd: '/b', ts: 200 } as any)
+    store.apply({ hook_event_name: 'Notification', session_id: 'waiting-1', notification_type: 'permission_prompt', ts: 250 } as any)
+    expect(store.list()[0].sessionId).toBe('waiting-1')
+    // pin idle → 应跨 group 置顶
+    store.setPinned('idle-1', true)
+    expect(store.list()[0].sessionId).toBe('idle-1')
+    expect(store.list()[0].pinned).toBe(true)
+  })
+
+  it('setPinned 已一致时返回 false,不重复 emit', () => {
+    const store = new SessionStore()
+    let count = 0
+    store.onChange(() => { count++ })
+    store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)
+    expect(count).toBe(1)  // SessionStart 触发一次
+    expect(store.setPinned('s1', true)).toBe(true)
+    expect(count).toBe(2)  // setPinned 触发一次
+    expect(store.setPinned('s1', true)).toBe(false)  // 已 pinned,no-op
+    expect(count).toBe(2)  // 没新增
+  })
+
+  it('setPinned 不存在的 session 返回 false', () => {
+    const store = new SessionStore()
+    expect(store.setPinned('never-seen', true)).toBe(false)
+  })
+
   it('updateFileOffset 持久化游标', () => {
     const store = new SessionStore()
     store.apply({ hook_event_name: 'SessionStart', session_id: 's1', cwd: '/p', ts: 1 } as any)

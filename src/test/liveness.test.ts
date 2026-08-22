@@ -54,6 +54,14 @@ function readProcState(pid: number): string | null {
 }
 
 describe('liveness e2e', () => {
+  // 跑完 pruneDeadSessions + 强制把 dyingAt 推过阈值,模拟"延迟到期"流程
+  function runFullPrune(store: SessionStore, dir: string): ReturnType<typeof pruneDeadSessions> {
+    const r1 = pruneDeadSessions(store, dir)
+    const past = Math.floor(Date.now() / 1000) - 3
+    for (const s of store.list()) store.setDyingAt(s.sessionId, past)
+    return pruneDeadSessions(store, dir)
+  }
+
   it('死的 pid 被移除,活的保留,没 pid 的跳过', async () => {
     const dir = makeTmpSessionsDir()
     const store = new SessionStore()
@@ -70,7 +78,8 @@ describe('liveness e2e', () => {
 
     await dying.kill()
 
-    const { removed } = pruneDeadSessions(store, dir)
+    // 走两 tick: 第一 tick 标 dying,推阈值,第二 tick 真移除
+    const { removed } = runFullPrune(store, dir)
     expect(removed).toBe(2)
 
     const remaining = store.list().map(s => s.sessionId).sort()
@@ -93,8 +102,14 @@ describe('liveness e2e', () => {
     const fakePid = 99_999_999
     store.apply({ hook_event_name: 'SessionStart', session_id: 'fake', cwd: '/f', ts: 1, pid: fakePid } as any)
     expect(store.list()).toHaveLength(1)
-    const { removed } = pruneDeadSessions(store, dir)
-    expect(removed).toBe(1)
+    // 走两 tick
+    const r1 = pruneDeadSessions(store, dir)
+    expect(r1.dying).toBe(1)
+    expect(r1.removed).toBe(0)
+    const past = Math.floor(Date.now() / 1000) - 3
+    for (const s of store.list()) store.setDyingAt(s.sessionId, past)
+    const r2 = pruneDeadSessions(store, dir)
+    expect(r2.removed).toBe(1)
     expect(store.list()).toHaveLength(0)
     fs.rmSync(dir, { recursive: true, force: true })
   })
@@ -114,10 +129,15 @@ describe('liveness e2e', () => {
     await new Promise(r => setTimeout(r, 100))
 
     const procState = readProcState(victim.pid)
+    // 走两 tick: 标 dying → 推阈值 → 真移除
+    const r1 = pruneDeadSessions(store, dir)
+    const past = Math.floor(Date.now() / 1000) - 3
+    for (const s of store.list()) store.setDyingAt(s.sessionId, past)
     const { removed, archived } = pruneDeadSessions(store, dir)
 
     if (procState === 'stopped' || procState === 'tracing_stop') {
       // Linux 上:SIGSTOP 必须被识别为 gone
+      expect(r1.dying).toBe(1)
       expect(removed).toBe(1)
       expect(archived).toHaveLength(1)
       expect(archived[0]).toContain(path.join('.ended', 'Z-stopped-'))
@@ -126,6 +146,7 @@ describe('liveness e2e', () => {
       expect(store.list()).toHaveLength(0)
     } else {
       // 非 Linux / /proc 拿不到:至少不能误杀活进程
+      expect(r1.dying).toBe(0)
       expect(removed).toBe(0)
       expect(store.list()).toHaveLength(1)
     }
@@ -244,15 +265,27 @@ describe('isProcessGone 平台路由', () => {
 })
 
 describe('pruneDeadSessions mkdirSync 频率', () => {
-  it('N 个死会话都被识别并从 store 移除', () => {
+  it('N 个死会话都被识别并从 store 移除 (dying 流程:首 tick 标 dying,次 tick 真正移除)', () => {
     const dir = makeTmpSessionsDir()
     const store = new SessionStore()
     store.apply({ hook_event_name: 'SessionStart', session_id: 'mk1', cwd: '/m', ts: 1, pid: 99_999_991 } as any)
     store.apply({ hook_event_name: 'SessionStart', session_id: 'mk2', cwd: '/m', ts: 1, pid: 99_999_992 } as any)
     store.apply({ hook_event_name: 'SessionStart', session_id: 'mk3', cwd: '/m', ts: 1, pid: 99_999_993 } as any)
 
-    const { removed } = pruneDeadSessions(store, dir)
-    expect(removed).toBe(3)
+    // 第一个 tick:检测到死亡,设 dyingAt,不立即移除
+    const r1 = pruneDeadSessions(store, dir)
+    expect(r1.dying).toBe(3)
+    expect(r1.removed).toBe(0)
+    expect(store.list()).toHaveLength(3)  // 还在 store
+    expect(store.list().every(s => s.dyingAt !== undefined)).toBe(true)
+
+    // 手动把 dyingAt 推到 3s 前,模拟 2s 延迟到期
+    const past = Math.floor(Date.now() / 1000) - 3
+    for (const s of store.list()) store.setDyingAt(s.sessionId, past)
+
+    // 第二个 tick:真正归档 + 移除
+    const r2 = pruneDeadSessions(store, dir)
+    expect(r2.removed).toBe(3)
     expect(store.list()).toHaveLength(0)
 
     fs.rmSync(dir, { recursive: true, force: true })
@@ -267,6 +300,12 @@ describe('pruneDeadSessions mkdirSync 频率', () => {
     store.apply({ hook_event_name: 'SessionStart', session_id: 'arc1', cwd: '/a', ts: 1, pid: 99_999_981 } as any)
     store.apply({ hook_event_name: 'SessionStart', session_id: 'arc2', cwd: '/a', ts: 1, pid: 99_999_982 } as any)
 
+    // 第一个 tick:标 dying
+    pruneDeadSessions(store, dir)
+    // 把 dyingAt 推过阈值
+    const past = Math.floor(Date.now() / 1000) - 3
+    for (const s of store.list()) store.setDyingAt(s.sessionId, past)
+    // 第二个 tick:真归档
     const { removed, archived } = pruneDeadSessions(store, dir)
     expect(removed).toBe(2)
     expect(archived).toHaveLength(2)
@@ -281,12 +320,46 @@ describe('pruneDeadSessions mkdirSync 频率', () => {
     store.apply({ hook_event_name: 'SessionStart', session_id: 'idem1', cwd: '/i', ts: 1, pid: 99_999_981 } as any)
     store.apply({ hook_event_name: 'SessionStart', session_id: 'idem2', cwd: '/i', ts: 1, pid: 99_999_982 } as any)
 
+    // 第一个 tick:标 dying
     const r1 = pruneDeadSessions(store, dir)
-    expect(r1.removed).toBe(2)
-    // 第二次没新死的,不报错、返回 0
+    expect(r1.dying).toBe(2)
+    expect(r1.removed).toBe(0)
+    // 推过阈值
+    const past = Math.floor(Date.now() / 1000) - 3
+    for (const s of store.list()) store.setDyingAt(s.sessionId, past)
+    // 第二个 tick:真移除
     const r2 = pruneDeadSessions(store, dir)
-    expect(r2.removed).toBe(0)
-    expect(r2.archived).toEqual([])
+    expect(r2.removed).toBe(2)
+    // 第三次:全部已移除,返回 0
+    const r3 = pruneDeadSessions(store, dir)
+    expect(r3.removed).toBe(0)
+    expect(r3.archived).toEqual([])
+
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('dying 中进程"诈尸" (再检测为活) → 取消 dying 标记,下次正常算 alive', () => {
+    const dir = makeTmpSessionsDir()
+    const store = new SessionStore()
+    // 用一个真实 spawn 的短命进程;第一步它死了,第二步(2s 后)我们重新 spawn 同样 PID (不可能),
+    // 改测:用 fake — setDyingAt 后清掉,然后 prune 不应触发 dying 分支
+    store.apply({ hook_event_name: 'SessionStart', session_id: 'revive', cwd: '/r', ts: 1, pid: 99_999_999 } as any)
+
+    // 先标 dying
+    const r1 = pruneDeadSessions(store, dir)
+    expect(r1.dying).toBe(1)
+    expect(store.list()[0].dyingAt).toBeDefined()
+
+    // 模拟"复活":清掉 dyingAt 但 PID 仍是死的
+    // 实际生产中,进程复活 PID 也变 —— 这里只测试"dying 状态下 isProcessGone 返回 false → 清 dyingAt"
+    // 用 mock 不太干净,直接测逻辑:把一个非死 PID (process.pid 自身) 的 session 标 dying,
+    // 然后 pruneDeadSessions 应清掉它的 dyingAt
+    const store2 = new SessionStore()
+    store2.apply({ hook_event_name: 'SessionStart', session_id: 'self', cwd: '/s', ts: 1, pid: process.pid } as any)
+    store2.setDyingAt('self', Math.floor(Date.now() / 1000))
+    const r2 = pruneDeadSessions(store2, dir)
+    expect(r2.dying).toBe(0)  // 没新 dying
+    expect(store2.list()[0].dyingAt).toBeUndefined()  // 之前的 dying 被清
 
     fs.rmSync(dir, { recursive: true, force: true })
   })
@@ -299,6 +372,11 @@ describe('pruneDeadSessions 归档名格式', () => {
     const sessionFile = path.join(dir, 'fmt.jsonl')
     fs.writeFileSync(sessionFile, '{"hook_event_name":"SessionStart","session_id":"fmt","cwd":"/f","ts":1,"pid":99999990}\n')
     store.apply({ hook_event_name: 'SessionStart', session_id: 'fmt', cwd: '/f', ts: 1, pid: 99_999_990 } as any)
+
+    // 标 dying → 推过阈值 → 真归档
+    pruneDeadSessions(store, dir)
+    const past = Math.floor(Date.now() / 1000) - 3
+    for (const s of store.list()) store.setDyingAt(s.sessionId, past)
 
     const { archived } = pruneDeadSessions(store, dir)
     expect(archived).toHaveLength(1)

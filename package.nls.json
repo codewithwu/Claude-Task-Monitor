@@ -1,0 +1,27 @@
+{
+  "extension.displayName": "Claude Task Monitor",
+  "extension.description": "Real-time sidebar monitor for all local Claude Code CLI sessions 🟢🟡🔴 — red dot means a session is waiting for permission; stop alt-tabbing between terminals.",
+
+  "category": "Claude Task Monitor",
+
+  "command.focusSessionsView.title": "Claude Task Monitor: Focus Sessions View",
+  "command.copySessionId.title": "Copy Session ID",
+  "command.copyAsJson.title": "Copy Session as JSON",
+  "command.openInTerminal.title": "Open in Integrated Terminal",
+  "command.revealInExplorer.title": "Reveal in File Explorer",
+  "command.archiveSession.title": "Archive Session Now",
+  "command.openInCurrentWindow.title": "Open in Current Window",
+  "command.toggleMute.title": "Toggle Notifications (Mute / Unmute)",
+  "command.viewSessionFile.title": "View Session File",
+  "command.togglePin.title": "Toggle Pin (Top)",
+  "command.copySessionIdOnSelected.title": "Copy Session ID (Selected)",
+  "command.copyAsJsonOnSelected.title": "Copy Session as JSON (Selected)",
+  "command.openInTerminalOnSelected.title": "Open in Integrated Terminal (Selected)",
+  "command.revealInExplorerOnSelected.title": "Reveal in File Explorer (Selected)",
+  "command.archiveSessionOnSelected.title": "Archive Session Now (Selected)",
+  "command.installHook.title": "Install / Reinstall Hook",
+  "command.showOnboarding.title": "Show Onboarding",
+  "command.copyJqInstallCommand.title": "Copy jq Install Command",
+  "command.setFilter.title": "Set View Filter (All / Waiting / Running / Idle)",
+  "command.openDocs.title": "Open Documentation"
+}

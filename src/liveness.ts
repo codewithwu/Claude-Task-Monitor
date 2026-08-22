@@ -101,29 +101,69 @@ function checkViaWslOrTasklist(pid: number): boolean {
 
 // 跟 hook.sh 在 SessionEnd 时的归档行为保持一致:把 .jsonl 移进 .ended/
 // 这样 watcher 看到 unlink 会派发 fileRemoved,store 自然被清
-export function pruneDeadSessions(store: SessionStore, sessionsDir: string): { removed: number; archived: string[] } {
+//
+// 视觉反馈 ("dying" 延迟移除):
+//   进程死亡检测到后,先 setDyingAt 标记,sidebar 行短暂变灰/strikethrough,
+//   2s 后才真正归档+移除 —— 避免用户看到 sidebar 行瞬间消失误以为 CLI 还活着。
+//
+// 多 tick 处理:
+//   - 第一次检测到进程死亡:只设 dyingAt,不归档
+//   - 后续 tick:dyingAt 已设且 elapsed ≥ 2s 才执行归档+移除
+//   - 进程"诈尸" (dying 中又检测为活):清掉 dyingAt
+export function pruneDeadSessions(store: SessionStore, sessionsDir: string): { removed: number; archived: string[]; dying: number } {
   const archived: string[] = []
   let removed = 0
+  let dying = 0
+  const nowSec = Math.floor(Date.now() / 1000)
   const endedDir = path.join(sessionsDir, '.ended')
-  // 提到循环外:路径在 tick 之间不会变,recursive:true 已经幂等但避免 N 次 stat
   fs.mkdirSync(endedDir, { recursive: true })
 
   for (const s of store.list()) {
     if (s.pid === undefined) continue
-    if (!isProcessGone(s.pid)) continue
-    const sessionFile = path.join(sessionsDir, `${s.sessionId}.jsonl`)
-    try {
-      if (fs.existsSync(sessionFile)) {
-        // randomUUID 切片保证同 tick 内多次归档也不撞名 (Date.now() 相同)
-        const target = path.join(endedDir, `${s.sessionId}-${Date.now()}-${randomUUID().slice(0, 8)}.jsonl`)
-        fs.renameSync(sessionFile, target)
-        archived.push(target)
+    const processGone = isProcessGone(s.pid)
+
+    // 已标记 dying 的 session:要么真正移除,要么检测到进程复活取消标记
+    if (s.dyingAt !== undefined) {
+      if (!processGone) {
+        // 进程复活,取消 dying 标记
+        store.setDyingAt(s.sessionId, undefined)
+        continue
       }
-    } catch {
-      // 归档失败也照样从 store 移除,避免死循环
+      if (nowSec - s.dyingAt < DYING_DURATION_SEC) continue
+      // 到期:归档 + 移除
+      archiveAndRemove(s, sessionsDir, endedDir, archived)
+      store.removeByPid(s.pid)
+      removed++
+      continue
     }
-    store.removeByPid(s.pid)
-    removed++
+
+    if (!processGone) continue
+
+    // 首次检测到死亡:标记 dying,留给后续 tick 处理
+    store.setDyingAt(s.sessionId, nowSec)
+    dying++
   }
-  return { removed, archived }
+  return { removed, archived, dying }
+}
+
+// dying 标记到真正移除的延迟:2s —— 用户余光能看到 sidebar 行短暂变灰再消失。
+const DYING_DURATION_SEC = 2
+
+function archiveAndRemove(
+  s: { sessionId: string },
+  sessionsDir: string,
+  endedDir: string,
+  archived: string[]
+): void {
+  const sessionFile = path.join(sessionsDir, `${s.sessionId}.jsonl`)
+  try {
+    if (fs.existsSync(sessionFile)) {
+      // randomUUID 切片保证同 tick 内多次归档也不撞名 (Date.now() 相同)
+      const target = path.join(endedDir, `${s.sessionId}-${Date.now()}-${randomUUID().slice(0, 8)}.jsonl`)
+      fs.renameSync(sessionFile, target)
+      archived.push(target)
+    }
+  } catch {
+    // 归档失败也照样从 store 移除 (在 caller 里做),避免死循环
+  }
 }

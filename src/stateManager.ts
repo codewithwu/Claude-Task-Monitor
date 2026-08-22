@@ -81,7 +81,13 @@ export class SessionStore {
 
   // 删除 session 时回调(给 Notifier.reset 等用,避免 dedup Map 永久膨胀)
   // 注意:apply(removed) 对未知 session 不回调(prev === null 短路),避免对幽灵 session 误触发
-  constructor(private readonly onSessionRemoved?: (sessionId: string) => void) {}
+  //
+  // mutedLookup 注入 per-session 静音查询(从 MutedStore 读)。reduce 不碰 muted 字段,
+  // 由 apply 在 reduce 之后 overlay —— 保持 reducer 纯净 + mute 状态单一来源在 MutedStore。
+  constructor(
+    private readonly onSessionRemoved?: (sessionId: string) => void,
+    private readonly mutedLookup?: (sessionId: string) => boolean
+  ) {}
 
   apply(event: HookPayload): void {
     const prev = this.sessions.get(event.session_id) ?? null
@@ -96,9 +102,23 @@ export class SessionStore {
     } else if (prev === null || result.state !== prev) {
       // reduce 对 Notification 非 permission_prompt / 未知 event 返回 prev 本身
       // (引用相等 = 真 no-op),这种情况跳过 set 和 emit
-      this.sessions.set(event.session_id, result.state)
+      const state = this.mutedLookup
+        ? { ...result.state, muted: this.mutedLookup(event.session_id) }
+        : result.state
+      this.sessions.set(event.session_id, state)
       this.emit()
     }
+  }
+
+  // 用户右键 toggle 静音:同步内存视图,MutedStore 自己负责落盘。
+  // 返回是否实际改了 (false = session 不存在或值已一致,no-op)
+  setMuted(sessionId: string, muted: boolean): boolean {
+    const s = this.sessions.get(sessionId)
+    if (!s) return false
+    if ((s.muted === true) === muted) return false  // 已一致
+    this.sessions.set(sessionId, { ...s, muted })
+    this.emit()
+    return true
   }
 
   get(sessionId: string): SessionState | undefined {
@@ -107,10 +127,35 @@ export class SessionStore {
 
   list(): SessionState[] {
     return [...this.sessions.values()].sort((a, b) => {
+      // pinned 会话置顶(跨 group)
+      const ap = a.pinned === true ? 0 : 1
+      const bp = b.pinned === true ? 0 : 1
+      if (ap !== bp) return ap - bp
       const p = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]
       if (p !== 0) return p
       return b.stateChangedAt - a.stateChangedAt
     })
+  }
+
+  // 切换 pinned:写入内存视图,返回是否实际改了 (false = session 不存在或值已一致)
+  setPinned(sessionId: string, pinned: boolean): boolean {
+    const s = this.sessions.get(sessionId)
+    if (!s) return false
+    if ((s.pinned === true) === pinned) return false
+    this.sessions.set(sessionId, { ...s, pinned })
+    this.emit()
+    return true
+  }
+
+  // liveness 检测到进程死亡:打 dyingAt 标记,2s 延迟后由 pruneDeadSessions 真移除。
+  // 设回 undefined 可取消 dying (例如进程其实没死只是检测误报)。
+  setDyingAt(sessionId: string, dyingAt: number | undefined): boolean {
+    const s = this.sessions.get(sessionId)
+    if (!s) return false
+    if (s.dyingAt === dyingAt) return false
+    this.sessions.set(sessionId, { ...s, dyingAt })
+    this.emit()
+    return true
   }
 
   updateFileOffset(sessionId: string, offset: number): void {

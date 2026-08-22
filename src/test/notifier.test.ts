@@ -100,26 +100,28 @@ describe('Notifier aggregate behavior', () => {
     const n = new Notifier(30, spy)
     n.notify('s1', 'Bash', '/p')
     expect(spy).toHaveBeenCalledTimes(1)
-    // dedup 窗口内,s1 再次 notify 不弹通知
-    n.notify('s1', 'Edit', '/p')
+    // dedup 窗口内,s1 + 同 toolName 再次 notify 不弹通知
+    n.notify('s1', 'Bash', '/p')
     expect(spy).toHaveBeenCalledTimes(1)
-    // 但 currentWaiting 应反映最新 toolName
-    const sessions = n.getWaitingSessions()
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0].toolName).toBe('Edit')
+    // 但 currentWaiting 应仍同步(同 session 同 tool 仍记录)
+    expect(n.getWaitingSessions()).toHaveLength(1)
+    // 关键变更:同 session 不同 toolName 视为新事件,会触发新通知
+    // (修复老版本连续 tool 请求只弹第一条的 bug)
+    n.notify('s1', 'Edit', '/p')
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(n.getWaitingSessions()[0].toolName).toBe('Edit')
   })
 
-  it('exitWaiting 移除 session,下次进 waiting 视作首次', () => {
+  it('exitWaiting 移除 session,下次进 waiting 视作首次 (同 session 不同 tool)', () => {
     const spy = vi.fn()
     const n = new Notifier(30, spy)
     n.notify('s1', 'Bash', '/p')
     expect(spy).toHaveBeenCalledTimes(1)
     n.exitWaiting('s1')
     expect(n.getWaitingSessions()).toHaveLength(0)
-    // 注意:exitWaiting 不清 dedup,所以 re-enter 在窗口内仍被拦截
-    // 这是有意的:防止同 session 频繁闪烁通知
+    // 注意:exitWaiting 不清 dedup,但同 session 不同 toolName 是新 dedupe key —— 视作首次
     n.notify('s1', 'Edit', '/p')
-    expect(spy).toHaveBeenCalledTimes(1)  // 仍 dedup 拦截
+    expect(spy).toHaveBeenCalledTimes(2)  // Edit 是新 key,弹通知
     expect(n.getWaitingSessions()).toHaveLength(1)
   })
 
@@ -142,5 +144,32 @@ describe('Notifier aggregate behavior', () => {
     expect(n.getWaitingCount()).toBe(2)
     n.exitWaiting('s1')
     expect(n.getWaitingCount()).toBe(1)
+  })
+
+  it('muted=true 时跳过弹通知,但 currentWaiting 仍同步 (status bar/badge 不丢)', () => {
+    const spy = vi.fn()
+    const n = new Notifier(30, spy)
+    n.notify('s1', 'Bash', '/p', true)  // muted
+    expect(spy).toHaveBeenCalledTimes(0)
+    expect(n.getWaitingSessions()).toHaveLength(1)
+    expect(n.getWaitingCount()).toBe(1)
+  })
+
+  it('muted=true 不阻止后续 unmute session 的弹通知 (muted 是 session 维度)', () => {
+    const spy = vi.fn()
+    const n = new Notifier(30, spy)
+    n.notify('s1', 'Bash', '/p', true)  // muted, 不弹
+    n.notify('s2', 'Edit', '/q', false)  // 未 muted, 弹
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('muted=true 不写 dedup 记录;后续 unmute 通知视为首次 (避免 mute 期间累积窗口)', () => {
+    const spy = vi.fn()
+    const n = new Notifier(30, spy)
+    n.notify('s1', 'Bash', '/p', true)        // muted, 不弹 + 不写 dedup
+    vi.advanceTimersByTime(10_000)
+    n.notify('s1', 'Bash', '/p', true)        // 仍 muted
+    n.notify('s1', 'Bash', '/p', false)       // unmute, 视为首次
+    expect(spy).toHaveBeenCalledTimes(1)
   })
 })
