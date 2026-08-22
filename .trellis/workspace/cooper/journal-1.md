@@ -120,3 +120,50 @@ Commit 拆分:extension.ts 同时含 Commit A (notify 按钮 i18n) 和 Commit B 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: Fix v0.2.0 refactor leftovers (i18n + 3 bugs)
+
+**Date**: 2026-08-23
+**Task**: Fix v0.2.0 refactor leftovers (i18n + 3 bugs)
+**Branch**: `main`
+
+### Summary
+
+Closed 10 verified findings from /code-review @src/ on commit be68481. 7 i18n cleanups (notification buttons, badge tooltip, rowPresentation status labels, viewsWelcome content, zh-cn togglePin title, banner.jqMissing typo, plus new badge.tooltip.* / status.label.* / welcome.content keys), 3 real bug fixes (cfg longWaitingThresholdSec hot-update via onDidChangeConfiguration listener, notifyMessage+statusBarContent 'more' count fix, currentFilter dead variable collapse). Added i18n key symmetry test (185→186 tests). New .trellis/spec/i18n.md capturing module design + deliberate non-fix on t() lang detection footgun.
+
+### Main Changes
+
+- i18n: 5 new symmetric keys (badge.tooltip.{one,many}, status.label.{waiting,running,idle}); fixed banner.jqMissing stray '['; zh-cn togglePin.title translated
+- i18n: package.json viewsWelcome → %welcome.content% + matching en/zh entries in package.nls*.json
+- i18n: extension.ts notification action buttons now use t('notify.action.*') (keys existed but were never referenced — en users saw Chinese buttons)
+- i18n: badge.ts tooltip + rowPresentation.ts statusLabel() both go through t()
+- fix: extension.ts adds workspace.onDidChangeConfiguration listener for longWaitingThresholdSec; treeDataProvider loses readonly + gains setLongWaitThreshold setter
+- fix: notifyMessage.ts:27 + statusBarContent.ts:54 'more' count from n → n-MAX (was 5-and-5-more / 5-等-5-个, now 5-and-2-more / 5-等-2-个)
+- simplify: extension.ts:67-68 collapse dead currentFilter intermediate var (4 lines → 1)
+- test: src/test/i18n.test.ts adds en/zh key-set symmetry assertion (Object.keys sort equality) — prevents future single-side additions
+- spec: new .trellis/spec/i18n.md captures module design + Finding 9 deliberate non-fix + vi.mock pattern + package metadata localization
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `68e3991` | (see git log) |
+| `6055292` | (see git log) |
+| `8580479` | (see git log) |
+
+### Testing
+
+- [OK] pnpm test: 186/186 pass (was 185; +1 from symmetry test)
+- [OK] pnpm build: tsup success, dist/extension.js 232.42 KB
+- [OK] trellis-check verdict: PASS — all 10 ACs verified across 16 files
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- git push origin main (4 commits ahead of origin)
+- Future backlog (out of scope here): extension.ts:deactivate() '是'/'否' buttons + 5 other Chinese toasts (lines 82/89/159/461/468) — see .trellis/spec/i18n.md 'Out of scope' section
+- Future backlog: integration test for cfg onDidChangeConfiguration hot-update path (currently manual-verification only)
