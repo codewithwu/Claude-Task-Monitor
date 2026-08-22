@@ -81,3 +81,42 @@
 ### Status
 
 [OK] **Completed**
+
+---
+
+## Task: fix-v020-leftovers (2026-08-23)
+
+清理 `/code-review @src/` 在 commit `be68481` 上扫出的 10 个 verified finding:
+- 7 个 i18n 收尾 (notification 按钮 / badge tooltip / rowPresentation status labels / viewsWelcome / 错乱的 zh-cn togglePin 翻译 / banner.jqMissing 多余 `[`)
+- 3 个真 bug (cfg `longWaitingThresholdSec` 注释撒谎需 reload → 改为真热更新 / `formatAggregateMessage` 和 `formatWaitingTooltip` 的 "more" 计数用 n 而非 n-MAX → 改对 / `currentFilter` 中间变量删除)
+
+故意不修:
+- Finding 9 (`t()` 把字面量 'en'/'zh' 当 lang override 吞掉的 footgun): `i18n.test.ts:94-100` 显式文档化,生产无触发,改 API 要审 8 个 caller → 见 `.trellis/spec/i18n.md` "Deliberate non-fix" 段
+- `deactivate()` 的中文按钮 + 其他 5 处 toast: 不在 finding list,保持 scope 紧凑
+
+实现要点:
+- i18n: 新增 5 个 key (`badge.tooltip.one/many` + `status.label.waiting/running/idle`) + 修 `banner.jqMissing` typo + viewsWelcome 改 `%welcome.content%`
+- 新增 `src/test/i18n.test.ts:101-110` 对称性测试 (`Object.keys(en).sort() === Object.keys(zh).sort()`),防止单边加 key 的 #2/#3/#5/#6 类 bug 重现
+- 引入 i18n 的 4 个测试 (`badge.test.ts`, `rowPresentation.test.ts`) 加 `vi.mock('vscode', () => ({ env: { language: 'zh-cn' } }))` mock,跟现有 `notifyMessage.test.ts`/`statusBar.test.ts` 模式一致
+- cfg 热更新: `treeDataProvider.longWaitThresholdSec` 去 `readonly` + 新增 `setLongWaitThreshold(sec)` setter + `extension.ts` 注册 `workspace.onDidChangeConfiguration` 监听器
+- 修两处 "more" 计数 bug: `notifyMessage.ts:27` 和 `statusBarContent.ts:54`,同步更新 3 个测试断言 (`notifyMessage.test.ts:57` 期望 `等 2 个`,`statusBar.test.ts:82/97` 期望 `等 1 个`)
+
+Commit 拆分:extension.ts 同时含 Commit A (notify 按钮 i18n) 和 Commit B (currentFilter + cfg 监听 + 注释) 的改动,为避免 partial staging 复杂度,所有 extension.ts 改动归到 Commit B,Commit A 用 10 个纯 i18n 文件,Commit B 用 6 个文件。
+
+测试: 185 → 186 cases (+1, i18n key 对称性测试)
+
+新 spec 文件:
+- `.trellis/spec/i18n.md` — 完整 i18n 模块设计 (自建 t() 而非 vscode.l10n 的 6 条理由 / 命名约定 / 占位符 / deliberate non-fix 论证 / 测试模式 / package metadata 本地化 / out-of-scope)
+- `testing.md` 添加一行 mock table 引用 `i18n` spec
+- `index.md` Guidelines Index 添加 i18n 入口
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `68e3991` | i18n: close v0.2.0 refactor leftovers |
+| `6055292` | fix: cfg hot-update + correct aggregate 'more' count + i18n buttons + simplify |
+
+### Status
+
+[OK] **Completed**

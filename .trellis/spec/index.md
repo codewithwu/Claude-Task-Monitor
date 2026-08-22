@@ -52,6 +52,7 @@ Single-process extension — there is no frontend/backend split. The tree view c
 | [Liveness](./liveness.md) | `isProcessGone()` platform router + archive format | Touching `liveness.ts` or PID-based pruning |
 | [Lifecycle](./lifecycle.md) | `extension.ts` activate/deactivate, config, installer, tree UI, notifier | Adding a config key, view, or uninstall behavior |
 | [Testing](./testing.md) | vitest with real child processes; cleanup | Writing tests, especially for liveness / hook |
+| [i18n](./i18n.md) | self-built t() module, en ↔ zh symmetry, package nls placeholders | Adding i18n keys, package metadata localization, i18n-related tests |
 
 Plus the project-wide thinking guides in [`guides/`](./guides/index.md) — those are not module-specific, read them whenever a new pattern appears.
 

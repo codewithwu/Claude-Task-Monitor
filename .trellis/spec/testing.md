@@ -21,6 +21,7 @@
 |--------|-----|-------|
 | `execFileSync` from `node:child_process` | Windows-branch tests for `isProcessGone` need to simulate `wsl.exe` and `tasklist` outputs without a real Windows host | `src/test/liveness.test.ts:9-12` |
 | `process.platform` | Same — set `win32` to exercise the Windows branch on Linux CI | `src/test/liveness.test.ts:166-170` |
+| `vscode` (env.language only) | Any test whose SUT calls `t()` from `src/i18n/index.ts` — see [[i18n]] for the vi.mock pattern. Existing users: `notifyMessage.test.ts:7`, `statusBar.test.ts:7`, `badge.test.ts`, `rowPresentation.test.ts` | `src/test/i18n.test.ts:6-8` (template) |
 | nothing else | Liveness tests use real Node child processes; hook tests invoke the real `bash resources/hook.sh`; everything else is plain vitest | — |
 
 `vi.mock` calls must come before the `import` of the module they mock. vitest hoists them, but the codebase uses an explicit pattern (`src/test/liveness.test.ts:9-14`):
