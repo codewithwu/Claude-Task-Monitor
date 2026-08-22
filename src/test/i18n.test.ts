@@ -99,3 +99,11 @@ describe('t() 占位符 + lang override', () => {
     expect(result).toBe('Bash waiting for permission: {1}')
   })
 })
+
+describe('i18n key 对称性', () => {
+  it('en 和 zh 的 key 集合完全一致 (防止后续单边加 key)', async () => {
+    const { en } = await import('../i18n/messages/en.js')
+    const { zh } = await import('../i18n/messages/zh.js')
+    expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
+  })
+})

@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderRowPresentation, LONG_WAITING_THRESHOLD_SEC } from '../util/rowPresentation.js'
 import type { SessionState } from '../types.js'
+
+// status label 文案走 i18n,显式 mock 为 zh-cn 跟现有断言对齐。
+vi.mock('vscode', () => ({ env: { language: 'zh-cn' } }))
 
 function makeSession(overrides: Partial<SessionState> & { status: SessionState['status'] }): SessionState {
   return {

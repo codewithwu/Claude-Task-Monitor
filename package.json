@@ -62,7 +62,7 @@
     "viewsWelcome": [
       {
         "view": "claudeTaskMonitor.sessionsView",
-        "contents": "## 没有看到你的 Claude 会话?\n\n启动 `claude` 后会自动出现 —— sidebar 第一次刷新可能需要 1-2 秒。\n\n### 还没显示?试试这些:\n\n[安装 hook](command:claudeTaskMonitor.installHook) · [查看 onboarding](command:claudeTaskMonitor.showOnboarding)\n\n[设置](command:workbench.action.openSettings,[\"claudeTaskMonitor\"]) · [打开文档](command:claudeTaskMonitor.openDocs)\n\n> 提示:确认 `jq` 已安装 (macOS `brew install jq` / Debian-Ubuntu `apt install jq`)。缺失时 sidebar 顶部会有红色提示。"
+        "contents": "%welcome.content%"
       }
     ],
     "commands": [

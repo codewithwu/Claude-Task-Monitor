@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import * as vscode from 'vscode'
 import { applyBadge } from '../ui/badge.js'
 import type { SessionState } from '../types.js'
@@ -6,6 +6,8 @@ import type { SessionStore } from '../stateManager.js'
 
 // applyBadge 是纯副作用函数(treeView.badge = ...)：
 // 用 fake treeView 验证 badge 字段被正确写入。
+// tooltip 文案走 i18n,language 显式 mock 为 zh-cn 跟现有断言对齐。
+vi.mock('vscode', () => ({ env: { language: 'zh-cn' } }))
 
 function makeFakeTreeView() {
   return { badge: undefined as vscode.ViewBadge | undefined }

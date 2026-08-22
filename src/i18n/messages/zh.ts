@@ -10,6 +10,15 @@ export const zh: Record<string, string> = {
   'status.tooltip.waitingManyTruncated': '{0} 个等待权限：{1} 等 {2} 个',
   'status.waitingSuffix': '{0}⚠',
 
+  // ─── sidebar badge tooltip ───
+  'badge.tooltip.one': '1 个会话正在等待权限确认',
+  'badge.tooltip.many': '{0} 个会话正在等待权限确认',
+
+  // ─── row presentation status ───
+  'status.label.waiting': '等待权限',
+  'status.label.running': '运行中',
+  'status.label.idle': '待命',
+
   // ─── notifications row / sidebar 状态 (single / aggregate) ───
   'notify.single': '{0} 等待权限确认：{1}',
   'notify.aggregate.short': '{0} 个会话正在等待：{1}',

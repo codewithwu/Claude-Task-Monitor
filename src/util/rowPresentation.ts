@@ -14,6 +14,7 @@ import * as path from 'node:path'
 import type { SessionState } from '../types.js'
 import { humanizeDuration } from './time.js'
 import { summarizeTool } from './toolSummary.js'
+import { t } from '../i18n/index.js'
 
 export interface RowPresentation {
   label: string
@@ -22,14 +23,9 @@ export interface RowPresentation {
   iconColor: string
 }
 
-const STATUS_LABEL: Record<SessionState['status'], string> = {
-  waiting: '等待权限',
-  running: '运行中',
-  idle:    '待命'
-}
-
 // tooltip 还要拼同一套状态文案,导出供 treeDataProvider 复用,避免双份
-export const statusLabel = (status: SessionState['status']): string => STATUS_LABEL[status]
+export const statusLabel = (status: SessionState['status']): string =>
+  t(`status.label.${status}` as const)
 
 // 长等阈值默认值(秒)。测试 / 默认值复用,真正的值由 caller 从 cfg 注入。
 export const DEFAULT_LONG_WAITING_THRESHOLD_SEC = 5 * 60
@@ -80,7 +76,7 @@ export function renderRowPresentation(
   // description: dying 时加 "已退出" 前缀 + 等待时长;正常时 status + tool + duration
   const dyingPrefix = dying ? '已退出 · ' : ''
   const toolPart = (s.status === 'waiting' && s.currentTool && !dying) ? ` · ${s.currentTool.name}` : ''
-  const description = `${dyingPrefix}${STATUS_LABEL[s.status]}${toolPart} · ${humanizeDuration(safeElapsed)}`
+  const description = `${dyingPrefix}${statusLabel(s.status)}${toolPart} · ${humanizeDuration(safeElapsed)}`
 
   return { label, description, iconId, iconColor }
 }

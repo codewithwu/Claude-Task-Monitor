@@ -10,6 +10,15 @@ export const en: Record<string, string> = {
   'status.tooltip.waitingManyTruncated': '{0} waiting sessions: {1} and {2} more',
   'status.waitingSuffix': '{0}⚠',
 
+  // ─── sidebar badge tooltip ───
+  'badge.tooltip.one': '1 session waiting for permission',
+  'badge.tooltip.many': '{0} sessions waiting for permission',
+
+  // ─── row presentation status (sidebar row description) ───
+  'status.label.waiting': 'Waiting',
+  'status.label.running': 'Running',
+  'status.label.idle': 'Idle',
+
   // ─── notifications row / sidebar 状态 (single / aggregate) ───
   'notify.single': '{0} waiting for permission: {1}',
   'notify.aggregate.short': '{0} sessions waiting: {1}',
@@ -28,7 +37,7 @@ export const en: Record<string, string> = {
   'onboarding.toast.copied': 'Copied: {0}. Paste in a terminal, then restart VS Code after jq is installed.',
 
   // ─── sidebar banner (jq missing) ───
-  'banner.jqMissing': '⚠️ Claude Task Monitor needs `jq` to work.\n\n[Copy [ command](command:claudeTaskMonitor.copyJqInstallCommand) · [Show onboarding](command:claudeTaskMonitor.showOnboarding)',
+  'banner.jqMissing': '⚠️ Claude Task Monitor needs `jq` to work.\n\n[Copy command](command:claudeTaskMonitor.copyJqInstallCommand) · [Show onboarding](command:claudeTaskMonitor.showOnboarding)',
 
   // ─── hook install / reinstall toast ───
   'hook.install.ok': 'Claude Task Monitor: hook installed. Run `claude` now; the red dot appears in the sidebar when a session is waiting.',

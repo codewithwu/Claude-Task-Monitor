@@ -6,10 +6,16 @@
 
 import * as vscode from 'vscode'
 import type { SessionStore } from '../stateManager.js'
+import { t } from '../i18n/index.js'
 
 export function applyBadge(treeView: vscode.TreeView<unknown>, store: SessionStore): void {
   const waiting = store.list().filter(s => s.status === 'waiting').length
   treeView.badge = waiting > 0
-    ? { value: waiting, tooltip: `${waiting} 个会话正在等待权限确认` }
+    ? {
+        value: waiting,
+        tooltip: waiting === 1
+          ? t('badge.tooltip.one')
+          : t('badge.tooltip.many', waiting)
+      }
     : undefined
 }
