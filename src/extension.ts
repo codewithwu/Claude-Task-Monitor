@@ -185,7 +185,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // 语言切换按钮 (08-23 ui-lang-toggle):独立 StatusBarItem,priority 99 紧邻 CTM。
   // 文本/tooltip 由 LangToggle 内部读 LangStore 计算。
-  const langToggle = new LangToggle(() => langStore.get())
+  const langToggle = new LangToggle(langStore)
 
   // 注册 reveal sidebar 命令 (status bar / 通知点击都触发)
   const focusCommand = vscode.commands.registerCommand(FOCUS_SESSIONS_VIEW_COMMAND, () => {
@@ -368,7 +368,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     copyJqInstallCommand,
     setFilterCommand,
     toggleLanguageCommand,
-    langStore,
     langToggle,
     // cfg 热更新:用户改 longWaitingThresholdSec 后立即生效,无需 reload window。
     // 监听器返回的 Disposable 直接 push 进 subscriptions,dispose 时自动解绑。

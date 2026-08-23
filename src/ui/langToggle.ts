@@ -10,8 +10,7 @@
 //   - LangStore.syncFromConfig() 后立即 render() (避免 1s tick 内的视觉延迟)
 
 import * as vscode from 'vscode'
-import type { LangPref } from '../util/langStore.js'
-import { nextPref } from '../util/langStore.js'
+import { type LangPref, LangStore, nextPref } from '../util/langStore.js'
 import { t } from '../i18n/index.js'
 
 // 短标签:跟状态名 (i18n) 区分,作为符号存在,不进 messages 表
@@ -24,7 +23,7 @@ const LABELS: Record<LangPref, string> = {
 export class LangToggle {
   private readonly item: vscode.StatusBarItem
 
-  constructor(private readonly currentPref: () => LangPref) {
+  constructor(private readonly store: LangStore) {
     this.item = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
       99
@@ -37,11 +36,10 @@ export class LangToggle {
 
   /**
    * 重画按钮文本 + tooltip。调用方负责在状态变化后调用 (extension.ts 的
-   * onDidChangeConfiguration 监听器)。
-   * currentPref 是 getter 而非 LangStore 实例 —— 避免循环依赖,test 容易注入。
+   * onDidChangeConfiguration 监听器,见 syncFromConfig + render 链路)。
    */
   render(): void {
-    const pref = this.currentPref()
+    const pref = this.store.get()
     const next = nextPref(pref)
     this.item.text = `$(globe) ${LABELS[pref]}`
     this.item.tooltip = t(

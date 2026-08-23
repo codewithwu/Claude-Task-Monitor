@@ -8,7 +8,8 @@
 //   - 不持有 EventEmitter —— 事件由 onDidChangeConfiguration 单一通道驱动,避免双触发
 //   - 不引入工作区作用域 —— 语言偏好是用户级,跨工作区保持一致 (跟 notifyMode 同型)
 //   - 幂等:同 pref 重复 set 不写 config,避免误触发 onDidChange
-//   - dispose 是 no-op,无资源需要释放 (subscriptions 由 extension.ts 推入并由 context 释放)
+//   - 无 dispose 需要:无 EventEmitter / 无定时器 / 无 IDisposable 字段
+//     (subscriptions 由 extension.ts 推 disposable,本身没有可释放资源)
 
 import * as vscode from 'vscode'
 
@@ -51,8 +52,7 @@ export class LangStore {
 
   /** 按 PREF_ORDER 前进一格 (auto → zh → en → auto loop),返回新 pref。 */
   async cycle(): Promise<LangPref> {
-    const idx = PREF_ORDER.indexOf(this.current)
-    const next = PREF_ORDER[(idx + 1) % PREF_ORDER.length]
+    const next = nextPref(this.current)
     await this.set(next)
     return next
   }
@@ -66,10 +66,6 @@ export class LangStore {
       .get<LangPref>('language', 'auto')
     this.current = cfg
     return this.current
-  }
-
-  dispose(): void {
-    // no-op: subscriptions managed by extension.ts context.subscriptions
   }
 }
 
