@@ -7,6 +7,107 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-23
+
+### Added
+
+- **status bar 语言切换按钮 (auto / 中文 / English)** (`src/ui/langToggle.ts`,
+  `src/util/langStore.ts`，`package.json`)：右下角紧邻 `CTM pulse` 的位置多出一个
+  `$(globe) 🌐` 按钮，点击在三态间循环 (`auto` → `zh` → `en` → `auto`)。
+  - `LangStore` 管理偏好（`Global` scope workspaceState）+ 配置写入 +
+    三态切换逻辑，启动时回放上次选择
+  - `LangToggle` 独立的 StatusBarItem (`priority 99`)，与 CTM pulse 视觉相邻
+  - i18n 模块新增 `setLangOverride()` / `getLangOverride()` 模块级 hook，
+    `detectLang()` 优先返回 override 值；`auto` 模式仍跟随 VS Code display language
+  - 切换时全 UI 立即重画：`onDidChangeConfiguration` 监听器扩展触发
+    `statusBar.update` / `applyBadge` / `treeDataProvider.refresh()`
+- **配置项 `claudeTaskMonitor.language`** (`enum: auto | zh | en`, 默认 `auto`)
+- **命令 `claudeTaskMonitor.toggleLanguage`**（Command Palette 可调，与按钮同效果）
+- **i18n key `lang.toggle.state.{auto,zh,en}` + `lang.toggle.tooltip`** ——
+  en / zh-cn 双语对称（tooltip 显式告知 "Command Palette / 视图标题仍由 VS Code
+  display language 决定"）
+
+### Testing
+
+- 新增 14 个 `LangStore` 单测（三态切换 / 持久化 / 监听器 / 边界）
+- 新增 4 个 i18n override 单测（auto/zh/en 三态 → 模块级 override → `detectLang`）
+- 单元测试总数：186 → 204（+18 用例）
+
+## [0.2.1] - 2026-08-23
+
+### Fixed
+
+- **i18n 收尾 —— 7 处硬编码中文 UI 文案遗漏**（影响英语用户）：
+  - 通知 action 按钮 `打开项目` / `查看侧边栏` 改为 i18n key
+    `notify.action.{openProject,viewSidebar}`（key 自 v0.2.0 定义但从未被引用）
+  - Sidebar badge tooltip `${waiting} 个会话正在等待权限确认` →
+    `t('badge.tooltip.one/many')`
+  - 侧边栏每行 description 中 `等待权限` / `运行中` / `待命` → `t('status.label.*')`，
+    新增 3 个 i18n key 双向对齐
+  - `viewsWelcome.contents` 改为 `%welcome.content%` 占位符 + `package.nls` 双语翻译
+  - `command.togglePin.title` zh-cn 翻译补完：`切换置顶 (Pin` →
+    `切换置顶 (置顶 / 取消)`，与 `切换通知 (静音 / 恢复)` 同一 pattern
+  - `banner.jqMissing` en 模板多余 `[`：`Copy [ command` → `Copy command`，跟中文对齐
+
+### Changed
+
+- `longWaitingThresholdSec` 配置支持热更新：去掉 `treeDataProvider.longWaitThresholdSec`
+  的 `readonly`，新增 `setLongWaitThreshold(sec)` setter；
+  `extension.ts` 注册 `workspace.onDidChangeConfiguration` 监听器。
+  改设置后 sidebar waiting 行立即用新阈值，**无需 reload window**
+- 聚合通知 "等 N 个" 数字现在正确：之前 5 个 waiting 时显示
+  `5 个会话正在等待: a, b, c 等 5 个`（N 用总数，看起来像 "5 and 5 more" 的废话）。
+  改为 `等 2 个`（N = 实际被截断数 = 5 - 3）。同一 bug 在 `formatWaitingTooltip` 一并修复
+- 合并 `extension.ts:67-68` 的 dead `currentFilter` 中间变量（4 行 → 1 行，行为不变）
+
+### Testing
+
+- 新增 i18n key 对称性测试：`Object.keys(en).sort() === Object.keys(zh).sort()`，
+  防止后续任务单边加 key 制造同类 bug
+- 单元测试总数：185 → 186（+1 用例）
+
+## [0.2.0] - 2026-08-23
+
+### Added
+
+- **单击 Session 在新窗口打开** (`forceNewWindow: true`)：之前点击替换当前
+  workspace，多任务并行丢失上下文
+- **Onboarding 可随时重入**：卸载钩子后 Welcome View 自动出现，引导重新安装；
+  `showOnboarding` 命令随时调出引导卡片；引导文案跟随 locale
+- **jq 缺失 banner**：检测到 `jq` 未装，视图顶部显示安装命令（brew / apt / winget），
+  点击**复制**按钮一键粘贴到终端
+- **色盲友好状态图标形状**：形状 + 颜色双重编码，灰度截图也能区分状态
+  | 状态 | 旧 | 新 |
+  |---|---|---|
+  | Running | `circle-filled` 蓝 | `sync~spin` 旋转 + 蓝 |
+  | Waiting | `circle-filled` 黄 | `circle-outline` 黄 + ⚠ |
+  | Waiting ≥ 阈值 | 同上 | `alert` 红色 ⚠ |
+- **通知模式 `claudeTaskMonitor.notifyMode`** (`silent` / `single` / `aggregate` /
+  `legacy`，默认 `single`)；同时修复 dedupe key `sessionId` → `(sessionId, toolName)`，
+  每个工具都正确收到通知
+- **长等阈值配置 `claudeTaskMonitor.longWaitingThresholdSec`**（默认 300s）
+- **快捷键**：`Shift+Cmd+C`（macOS）/ `Shift+Ctrl+C`（Win/Linux）聚焦 Session 视图
+- **右键菜单 6 项 + Command Palette 9 项命令**：`Open in New/Current Window` /
+  `View Session File` / `Copy Session ID` / `Toggle Pin` / `Toggle Mute` 等
+- **Session 分组与过滤**：默认按状态分组（Running / Waiting / Idle / Dying），
+  `defaultFilter` 配置 + `setFilter` 命令在状态栏切换，Pinned Session 始终排第一
+- **配置入口与 Welcome 重构**：4 个新配置项分类进命令面板，Welcome View 一键安装 hook
+- **Liveness 视觉反馈**：进程退出后显示 `⚠ 已退出 · 正在验证`（2 秒延迟），
+  确认真的死后才归档，避免"诈尸"场景下的视觉跳变
+- **中英双语 i18n**：所有动态 UI 文案走 `src/i18n/` 模块，自动检测
+  `vscode.env.language`，`package.nls.json`（en）+ `package.nls.zh-cn.json`（zh-cn）双轨
+- 状态栏 tooltip 显示前 3 个 waiting session 的项目名 + 等待时长
+
+### Changed
+
+- 升级 `engines.vscode` 至 `^1.86.0`（`TreeView<T>.badge` API 需要 1.86+）
+- 构建配置升级 `node16` 模块解析（消除 TS 7.0 计划的 deprecation 警告）
+
+### Testing
+
+- 新增 43 个单测（事件 reducer、SessionStore 分组、installer、watcher 等核心模块）
+- 单元测试总数：142 → 185
+
 ## [0.1.9] - 2026-08-16
 
 ### Changed
