@@ -7,6 +7,48 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-24
+
+### Fixed
+
+- **状态栏语言切换按钮 + i18n 模块的 7 处加固**（基于 `08-23 ui-lang-toggle`
+  code review 结果）：
+  - **jq 缺失 banner 切语言后跟随刷新**（`src/extension.ts`）：之前 banner 只在
+    激活时设一次，切语言后 sidebar 顶部警告停留在原 locale 直到 reload window。
+    把 `applyJqBanner()` 加入 `onDidChangeConfiguration` 语言分支，跟其他 UI 一起刷。
+  - **`toggleLanguageCommand` 不再吞错**（`src/extension.ts`）：
+    `workspace.getConfiguration().update()` 在受限 profile / schema 校验失败时会 reject,
+    之前 fire-and-forget 把 Promise 丢给 `registerCommand`,失败时用户看不到任何反馈。
+    改为 async + try/catch,通过新增 `lang.toggle.fail` i18n key 弹错误 toast。
+  - **`LangStore.set()` 写失败不再污染状态**（`src/util/langStore.ts`）：
+    之前先改 `this.current` 再 `await config.update()`,update 抛错时 in-memory 跟
+    config 永久偏离,下次 `cycle()` 会把用户的 `auto` 偏好静默覆盖成 `en`。赋值
+    挪到 await 之后,失败时 `this.current` 保持原值,`syncFromConfig()` 自动对账。
+  - **非法 pref 渲染字面量 "undefined" 的兜底**（`src/ui/langToggle.ts`）：
+    settings.json 手编辑成 enum 之外的值（`"language": "fr"`,绕过 package.json
+    enum）时 `LABELS[pref]` 返回 undefined,status bar 显示 `$(globe) undefined`,
+    tooltip 漏出原始 i18n key。新增 `safePref()` 守卫 + `lang.toggle.invalid` tooltip,
+    显示 `?` 并提示用户点击自愈（cycle() 会自然落到 `PREF_ORDER[0]='auto'`）。
+  - **`LangStore.currentLang()` 委托给 `i18n.detectLang()`**（`src/util/langStore.ts`）：
+    消除 `startsWith('zh')` 检测逻辑的双处维护。以后加 ja/ko 只改一处。
+  - **`LangToggle` 构造函数收窄回 getter**（`src/ui/langToggle.ts`）：commit 661d891
+    把它从 `() => LangPref` getter 改成完整 `LangStore` 实例,实际上 `render()` 只调
+    `.get()`。恢复窄接口,跟 LangStore 的写方法（set/cycle/syncFromConfig）解耦。
+  - **i18n 测试 override block 还原 `env.language`**（`src/test/i18n.test.ts`）：
+    4 个 override test 把 `vscode.env.language` 留在不确定状态,只清 `setLangOverride`
+    不还原 env,会污染后续测试。补 `originalLang` 捕获 + 还原,跟第一个 describe
+    块对齐。
+
+### Testing
+
+- 单元测试总数保持 204（未新增用例,但 `i18n.test.ts` 的 override block 现在测试
+  间状态隔离正确,不再有顺序敏感 flaky 风险）
+
+[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.2.0...v0.2.1
+
 ## [0.3.0] - 2026-08-23
 
 ### Added
