@@ -53,8 +53,18 @@ describe('detectLang', () => {
 })
 
 describe('detectLang override (08-23 ui-lang-toggle)', () => {
-  beforeEach(() => setLangOverride(undefined))
-  afterEach(() => setLangOverride(undefined))
+  let originalLang: string
+  beforeEach(() => {
+    originalLang = vscode.env.language
+    setLangOverride(undefined)
+  })
+  // 跟第一个 describe 块对齐:env.language 在每个 case 末尾还原成进入 case 前的值,
+  // 避免 4 个 override test 把 env 留在不确定状态 (zh-cn / en 交替),让后续依赖
+  // vscode.env.language 的测试随顺序 flaky。setLangOverride 也要清 —— 模块级共享变量。
+  afterEach(() => {
+    setLang(originalLang)
+    setLangOverride(undefined)
+  })
 
   it('override 优先于 vscode.env.language', () => {
     setLang('zh-cn')  // env = zh

@@ -184,8 +184,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   statusBar.update(store)
 
   // 语言切换按钮 (08-23 ui-lang-toggle):独立 StatusBarItem,priority 99 紧邻 CTM。
-  // 文本/tooltip 由 LangToggle 内部读 LangStore 计算。
-  const langToggle = new LangToggle(langStore)
+  // 文本/tooltip 由 LangToggle 内部读 LangStore 计算。构造参数收窄为 getter
+  // (render() 只读 pref),跟 LangStore 写方法解耦。
+  const langToggle = new LangToggle(() => langStore.get())
 
   // 注册 reveal sidebar 命令 (status bar / 通知点击都触发)
   const focusCommand = vscode.commands.registerCommand(FOCUS_SESSIONS_VIEW_COMMAND, () => {
@@ -315,7 +316,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // 语言切换按钮 (08-23 ui-lang-toggle):Command Palette + status bar 入口共用。
   // cycle() 写 config → 触发 onDidChangeConfiguration 监听器 → 刷 UI。
-  const toggleLanguageCommand = vscode.commands.registerCommand('claudeTaskMonitor.toggleLanguage', () => langStore.cycle())
+  // 错误处理:workspace.getConfiguration().update() 在受限 profile / schema 校验失败时会
+  // reject,之前 fire-and-forget 把 Promise 丢给 registerCommand,失败时用户看不到任何
+  // 反馈 —— 按钮状态不变,也无 toast。这里 await + try/catch,失败弹错,让用户知道出了啥事。
+  const toggleLanguageCommand = vscode.commands.registerCommand('claudeTaskMonitor.toggleLanguage', async () => {
+    try {
+      await langStore.cycle()
+    } catch (e) {
+      void vscode.window.showErrorMessage(
+        t('lang.toggle.fail', (e as Error).message ?? String(e))
+      )
+    }
+  })
 
   // store 变化时同步刷新 status bar 文案 + sidebar 徽标。
 // 用 waitingCount 闭包变量去重,避免 UserPromptSubmit / PreToolUse /
@@ -379,13 +391,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         provider.setLongWaitThreshold(newSec)
       }
       // 语言切换 (08-23 ui-lang-toggle):sync 重读 → override → 全套 UI 重画。
-      // 包括 statusBar / badge tooltip / tree description / 按钮自身,
+      // 包括 statusBar / badge tooltip / tree description / 按钮自身 / jq 缺失 banner,
       // 新弹的 notification / toast / quickPick 自动用新语言 (它们是事件触发的)。
+      // banner 之前漏在重画列表里 —— 切语言后 sidebar 顶部的中文/英文 warning 不会变,
+      // 直到下次 reload。applyJqBanner() 内部读 t(),放进来就跟其他 UI 一起刷。
       if (e.affectsConfiguration('claudeTaskMonitor.language')) {
         langStore.syncFromConfig()
         setLangOverride(langStore.currentLang())
         statusBar.update(store)
         applyBadge(treeView, store)
+        applyJqBanner(treeView, hasJq)
         provider.refresh()
         langToggle.render()
       }

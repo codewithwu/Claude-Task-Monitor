@@ -12,6 +12,7 @@
 //     (subscriptions 由 extension.ts 推 disposable,本身没有可释放资源)
 
 import * as vscode from 'vscode'
+import { detectLang } from '../i18n/index.js'
 
 export type LangPref = 'auto' | 'zh' | 'en'
 export type Lang = 'zh' | 'en'
@@ -33,21 +34,25 @@ export class LangStore {
 
   /**
    * 把 pref 解析成实际生效的 lang。
-   * 'auto' 时回落到 vscode.env.language (沿用 detectLang 行为)。
+   * 'auto' 时回落到 i18n.detectLang (auto 分支只看 vscode.env.language,这里直接复用,
+   * 避免双处维护 startsWith('zh') 逻辑)。
    */
   currentLang(): Lang {
-    if (this.current === 'auto') {
-      return vscode.env.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
-    }
-    return this.current
+    return this.current === 'auto' ? detectLang() : this.current
   }
 
-  /** 写入新偏好。同 pref 重复设直接返回,不触发 config write。 */
+  /**
+   * 写入新偏好。同 pref 重复设直接返回,不触发 config write。
+   * 注意:必须 await config.update() 成功后才更新内部状态 —— 如果先改 this.current
+   * 再写 config,update() 抛错会让 in-memory 跟 config 永久偏离,下次 cycle() 会把
+   * 用户的 'auto' 静默覆盖成 'en'。把赋值挪到 await 之后,失败时 this.current 保持
+   * 不变,syncFromConfig() 重新对账即可。
+   */
   async set(pref: LangPref): Promise<void> {
     if (pref === this.current) return
-    this.current = pref
     await vscode.workspace.getConfiguration('claudeTaskMonitor')
       .update('language', pref, vscode.ConfigurationTarget.Global)
+    this.current = pref
   }
 
   /** 按 PREF_ORDER 前进一格 (auto → zh → en → auto loop),返回新 pref。 */

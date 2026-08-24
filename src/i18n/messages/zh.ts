@@ -69,5 +69,13 @@ export const zh: Record<string, string> = {
   'lang.toggle.state.auto': '自动',
   'lang.toggle.state.zh': '中文',
   'lang.toggle.state.en': '英文',
-  'lang.toggle.tooltip': '界面语言: {0}\n点击切换到 {1}\n命令面板名称跟随 VS Code display language'
+  'lang.toggle.tooltip': '界面语言: {0}\n点击切换到 {1}\n命令面板名称跟随 VS Code display language',
+  // 异常兜底:settings.json 手编辑成 enum 之外的值时,显示 '?' 提示状态异常,
+  // tooltip 告知原始值 + 点击自愈。
+  // {0} = 原始字符串值
+  'lang.toggle.invalid': "界面语言: 无效值 '{0}'\n点击重置为自动",
+  // cycle() 失败:workspace config.update() reject (受限 profile / schema 校验失败等)。
+  // 之前是 fire-and-forget,失败时用户看到按钮不动且无任何反馈。
+  // {0} = 底层错误信息
+  'lang.toggle.fail': '切换界面语言失败:{0}'
 }

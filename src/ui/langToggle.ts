@@ -8,9 +8,12 @@
 //   - 用户点按钮 → cycle() 写 config → onDidChangeConfiguration 监听器 → render()
 //   - 用户在 Settings UI 改 language → onDidChangeConfiguration 监听器 → render()
 //   - LangStore.syncFromConfig() 后立即 render() (避免 1s tick 内的视觉延迟)
+//
+// 构造函数参数:接受 `() => LangPref` getter 而不是完整 LangStore 实例 —— render() 只读 pref,
+// 跟 LangStore 的写方法 (set/cycle/syncFromConfig) 解耦,跟 commit 661d891 之前的窄接口对齐。
 
 import * as vscode from 'vscode'
-import { type LangPref, LangStore, nextPref } from '../util/langStore.js'
+import { type LangPref, nextPref } from '../util/langStore.js'
 import { t } from '../i18n/index.js'
 
 // 短标签:跟状态名 (i18n) 区分,作为符号存在,不进 messages 表
@@ -20,10 +23,17 @@ const LABELS: Record<LangPref, string> = {
   en: 'EN'
 }
 
+// 运行时防御:settings.json 被手编辑成 enum 之外的值 (例如 'fr'),LangStore 不会校验
+// 直接存进来。render() 必须能容忍,否则 status bar 会渲染字面量 'undefined'。
+// 返回 null 时调用方负责兜底展示 (见 render())。
+function safePref(p: LangPref): LangPref | null {
+  return p === 'auto' || p === 'zh' || p === 'en' ? p : null
+}
+
 export class LangToggle {
   private readonly item: vscode.StatusBarItem
 
-  constructor(private readonly store: LangStore) {
+  constructor(private readonly getPref: () => LangPref) {
     this.item = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
       99
@@ -39,7 +49,16 @@ export class LangToggle {
    * onDidChangeConfiguration 监听器,见 syncFromConfig + render 链路)。
    */
   render(): void {
-    const pref = this.store.get()
+    const raw = this.getPref()
+    const pref = safePref(raw)
+    if (pref === null) {
+      // 非法 pref:显示 '?' 让用户看到异常,tooltip 告知原始值;
+      // 用户点击 → cycle() 会把任意 pref 推进到 PREF_ORDER[0]='auto' (indexOf 不命中 → 0),
+      // 自愈到合法值,无需专门写 reset 命令。
+      this.item.text = '$(globe) ?'
+      this.item.tooltip = t('lang.toggle.invalid', raw)
+      return
+    }
     const next = nextPref(pref)
     this.item.text = `$(globe) ${LABELS[pref]}`
     this.item.tooltip = t(
