@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-25
+
+### Fixed
+
+- **i18n lang pipeline 5 处 code-review 加固**（commit `793bcfe`，08-23
+  `ui-lang-toggle` review 后续）：
+  - **`LangStore.currentLang()` 'auto' 不再被 module override 污染**
+    （`src/util/langStore.ts`）：之前调 `i18n.detectLang()` 读 override，
+    `auto → zh → en → auto` 循环回不到 env。新增 `detectEnvLang()`（env only，
+    绕过 override）专供 `currentLang()` 的 'auto' 分支，让语义在数据层独立。
+    `src/extension.ts` 的 config 监听器在 pref=`auto` 时显式
+    `setLangOverride(undefined)`，与 `.trellis/spec/i18n.md:20` 对齐。
+  - **`toggleLanguageCommand` catch 块 null-safe**（`src/extension.ts`）：
+    `workspace.getConfiguration().update()` 可能 reject null/undefined，
+    `(e as Error).message` 让错误处理本身抛 TypeError。改为
+    `e instanceof Error ? e.message : String(e)`。
+  - **`LangStore` 数据层加 `isLangPref()` 守卫**（`src/util/langStore.ts`）：
+    构造器 + `syncFromConfig()` 收到非法 pref 回落到 `'auto'` +
+    `console.warn`。`LangToggle.render()` 也改用 `isLangPref()`，删除本地
+    `safePref()`，单一事实源（`PREF_ORDER`）。
+
+### Testing
+
+- 单元测试 227 passed（195 既有 + 32 新）。
+
 ## [0.3.1] - 2026-08-24
 
 ### Fixed
@@ -44,7 +69,8 @@
 - 单元测试总数保持 204（未新增用例,但 `i18n.test.ts` 的 override block 现在测试
   间状态隔离正确,不再有顺序敏感 flaky 风险）
 
-[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.2.0...v0.2.1
