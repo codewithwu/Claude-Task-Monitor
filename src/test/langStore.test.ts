@@ -4,7 +4,7 @@
 //     记录 update 调用 + 返回预置的 get 值
 //   - 沿用 i18n.test.ts 的 mock 模式 (见 [[testing]])
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // 桩 vscode 模块:LangStore 只依赖 workspace.getConfiguration().update() / .get()
 // + env.language (供 currentLang() 在 auto 模式下解析)。
@@ -29,7 +29,8 @@ vi.mock('vscode', () => ({
 }))
 
 // 必须在 vi.mock 之后 import (即使 vi.mock 自动 hoist,显式 import 也保证运行顺序)
-import { LangStore, nextPref, type LangPref } from '../util/langStore.js'
+import { LangStore, isLangPref, nextPref, type LangPref } from '../util/langStore.js'
+import { setLangOverride } from '../i18n/index.js'
 
 describe('LangStore cycle', () => {
   beforeEach(() => {
@@ -131,4 +132,68 @@ describe('nextPref 纯函数', () => {
   ] as Array<[LangPref, LangPref]>)('%s → %s', (input, expected) => {
     expect(nextPref(input)).toBe(expected)
   })
+})
+
+describe('LangStore.currentLang 与 module override 隔离 (08-25)', () => {
+  // env 默认是 'en' (mock);setLangOverride 让 override 模块级共享变量受控。
+  beforeEach(() => {
+    setLangOverride(undefined)
+  })
+  afterEach(() => {
+    setLangOverride(undefined)
+  })
+
+  it('auto 不读 module override —— env=en 但 override=zh 仍跟随 env', () => {
+    setLangOverride('zh')
+    expect(new LangStore('auto').currentLang()).toBe('en')
+  })
+
+  it('auto → zh → en → auto: 回到 env (en)', async () => {
+    const s = new LangStore('auto')
+    await s.set('zh')
+    await s.set('en')
+    await s.set('auto')
+    expect(s.currentLang()).toBe('en')
+  })
+})
+
+describe('LangStore defensive fallback (08-25)', () => {
+  it('构造器收到非法 pref 回落到 auto + warn 一次', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const s = new LangStore('fr' as unknown as LangPref)
+    expect(s.get()).toBe('auto')
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
+  })
+
+  it('构造器收到 null/undefined 也回落', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(new LangStore(null as unknown as LangPref).get()).toBe('auto')
+    expect(new LangStore(undefined as unknown as LangPref).get()).toBe('auto')
+    expect(spy).toHaveBeenCalledTimes(2)
+    spy.mockRestore()
+  })
+
+  it('syncFromConfig 读到非法 pref 回落到 auto + warn', () => {
+    mockConfigValue = 'fr'
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const s = new LangStore('zh')
+    expect(s.syncFromConfig()).toBe('auto')
+    expect(s.get()).toBe('auto')
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
+  })
+})
+
+describe('isLangPref (08-25)', () => {
+  it.each(['auto', 'zh', 'en'])('接受合法值 %s', (p) => {
+    expect(isLangPref(p)).toBe(true)
+  })
+
+  it.each(['fr', 'zh-cn', 'en-us', '', 'AUTO', null, undefined, 0, {}, []])(
+    '拒绝非法值 %s',
+    (p) => {
+      expect(isLangPref(p as unknown)).toBe(false)
+    }
+  )
 })

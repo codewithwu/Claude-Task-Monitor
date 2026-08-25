@@ -12,7 +12,7 @@
 //     (subscriptions 由 extension.ts 推 disposable,本身没有可释放资源)
 
 import * as vscode from 'vscode'
-import { detectLang } from '../i18n/index.js'
+import { detectEnvLang } from '../i18n/index.js'
 
 export type LangPref = 'auto' | 'zh' | 'en'
 export type Lang = 'zh' | 'en'
@@ -20,10 +20,28 @@ export type Lang = 'zh' | 'en'
 // cycle 顺序:用户在 status bar 点击按钮按此序列前进
 const PREF_ORDER: readonly LangPref[] = ['auto', 'zh', 'en'] as const
 
+/**
+ * 运行时校验:任意 unknown 是否是合法 LangPref。
+ * 供 LangStore 构造器 / syncFromConfig 在手编辑 settings.json / schema 漂移时
+ * 退回到 'auto';供 LangToggle.render() 替代手维护的合法值枚举。
+ * 实现:PREF_ORDER.includes 是单一事实源,新 pref 加入只需改 PREF_ORDER。
+ */
+export function isLangPref(p: unknown): p is LangPref {
+  return typeof p === 'string' && (PREF_ORDER as readonly string[]).includes(p)
+}
+
 export class LangStore {
   private current: LangPref
 
   constructor(initial: LangPref) {
+    if (!isLangPref(initial)) {
+      console.warn(
+        `[claude-task-monitor] LangStore: invalid pref "${String(initial)}", ` +
+        `falling back to "auto". Valid values: ${PREF_ORDER.join(', ')}`
+      )
+      this.current = 'auto'
+      return
+    }
     this.current = initial
   }
 
@@ -34,11 +52,16 @@ export class LangStore {
 
   /**
    * 把 pref 解析成实际生效的 lang。
-   * 'auto' 时回落到 i18n.detectLang (auto 分支只看 vscode.env.language,这里直接复用,
-   * 避免双处维护 startsWith('zh') 逻辑)。
+   * - pref='auto' → detectEnvLang() (env only,**不读** module override)
+   * - pref='zh'/'en' → 直接返回
+   *
+   * 为什么 'auto' 走 detectEnvLang 而非 detectLang:
+   * module override 在 set(zh/en) 时被 setLangOverride 写入,在 set(auto) 时
+   * 必须清空 (由 extension.ts 的 config listener 处理)。走 detectEnvLang 让
+   * LangStore 自己对 'auto' 的语义负责,不依赖外部清空动作。
    */
   currentLang(): Lang {
-    return this.current === 'auto' ? detectLang() : this.current
+    return this.current === 'auto' ? detectEnvLang() : this.current
   }
 
   /**
@@ -65,11 +88,23 @@ export class LangStore {
   /**
    * 从 config 重读最新值。供 extension.ts 的 onDidChangeConfiguration 监听器调用,
    * 避免在异步 set() 与事件触发之间读到陈旧状态。
+   *
+   * 防御层:config 里出现非 LangPref 值 (手编辑 settings.json / schema 漂移)
+   * 时回落到 'auto' + warn。LangToggle.render() 也会再校验一次,
+   * 但那是 UI 兜底 —— 数据层先挡住,避免 UI 看到污染数据。
    */
   syncFromConfig(): LangPref {
     const cfg = vscode.workspace.getConfiguration('claudeTaskMonitor')
       .get<LangPref>('language', 'auto')
-    this.current = cfg
+    if (isLangPref(cfg)) {
+      this.current = cfg
+      return this.current
+    }
+    console.warn(
+      `[claude-task-monitor] LangStore: config has invalid language "${String(cfg)}", ` +
+      `falling back to "auto".`
+    )
+    this.current = 'auto'
     return this.current
   }
 }

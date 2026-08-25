@@ -8,7 +8,7 @@ vi.mock('vscode', () => ({
 }))
 
 import * as vscode from 'vscode'
-import { detectLang, getMessages, t, setLangOverride } from '../i18n/index.js'
+import { detectLang, detectEnvLang, getMessages, t, setLangOverride } from '../i18n/index.js'
 
 function setLang(lang: string): void {
   Object.defineProperty(vscode.env, 'language', { value: lang, configurable: true })
@@ -94,6 +94,45 @@ describe('detectLang override (08-23 ui-lang-toggle)', () => {
     setLangOverride('zh')
     // 显式传 lang 跳过 detectLang,override 不影响此路径
     expect(t('status.label.waiting', 'en')).toBe('Waiting')
+  })
+})
+
+describe('detectEnvLang (08-25 fix-i18n-lang-bugs)', () => {
+  let originalLang: string
+  beforeEach(() => {
+    originalLang = vscode.env.language
+    setLangOverride(undefined)
+  })
+  afterEach(() => {
+    setLang(originalLang)
+    setLangOverride(undefined)
+  })
+
+  it('zh-cn → zh', () => {
+    setLang('zh-cn')
+    expect(detectEnvLang()).toBe('zh')
+  })
+
+  it('en-us → en', () => {
+    setLang('en-us')
+    expect(detectEnvLang()).toBe('en')
+  })
+
+  it('ja-jp → en (fallback)', () => {
+    setLang('ja-jp')
+    expect(detectEnvLang()).toBe('en')
+  })
+
+  it('不读 override (env=en 但 override=zh 仍返回 en)', () => {
+    setLang('en')
+    setLangOverride('zh')
+    expect(detectEnvLang()).toBe('en')
+  })
+
+  it('不读 override (env=zh 但 override=undefined 仍返回 zh)', () => {
+    setLang('zh-cn')
+    // setLangOverride(undefined) 已经在 beforeEach 调用
+    expect(detectEnvLang()).toBe('zh')
   })
 })
 

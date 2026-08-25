@@ -13,7 +13,7 @@
 // 跟 LangStore 的写方法 (set/cycle/syncFromConfig) 解耦,跟 commit 661d891 之前的窄接口对齐。
 
 import * as vscode from 'vscode'
-import { type LangPref, nextPref } from '../util/langStore.js'
+import { type LangPref, isLangPref, nextPref } from '../util/langStore.js'
 import { t } from '../i18n/index.js'
 
 // 短标签:跟状态名 (i18n) 区分,作为符号存在,不进 messages 表
@@ -21,13 +21,6 @@ const LABELS: Record<LangPref, string> = {
   auto: 'A',
   zh: '中',
   en: 'EN'
-}
-
-// 运行时防御:settings.json 被手编辑成 enum 之外的值 (例如 'fr'),LangStore 不会校验
-// 直接存进来。render() 必须能容忍,否则 status bar 会渲染字面量 'undefined'。
-// 返回 null 时调用方负责兜底展示 (见 render())。
-function safePref(p: LangPref): LangPref | null {
-  return p === 'auto' || p === 'zh' || p === 'en' ? p : null
 }
 
 export class LangToggle {
@@ -50,20 +43,20 @@ export class LangToggle {
    */
   render(): void {
     const raw = this.getPref()
-    const pref = safePref(raw)
-    if (pref === null) {
-      // 非法 pref:显示 '?' 让用户看到异常,tooltip 告知原始值;
-      // 用户点击 → cycle() 会把任意 pref 推进到 PREF_ORDER[0]='auto' (indexOf 不命中 → 0),
-      // 自愈到合法值,无需专门写 reset 命令。
+    if (!isLangPref(raw)) {
+      // 非法 pref:理论上 LangStore 已经过滤了 (构造器 / syncFromConfig 都会校验),
+      // 但渲染层兜底 —— 万一有人直接传非 LangPref 进 LangToggle,这里仍能显示 '?' +
+      // tooltip,而不是字面量 'undefined'。点击 → cycle() 会把任意 pref 推进到
+      // PREF_ORDER[0]='auto' (nextPref: indexOf 不命中 → 0),自愈到合法值。
       this.item.text = '$(globe) ?'
       this.item.tooltip = t('lang.toggle.invalid', raw)
       return
     }
-    const next = nextPref(pref)
-    this.item.text = `$(globe) ${LABELS[pref]}`
+    const next = nextPref(raw)
+    this.item.text = `$(globe) ${LABELS[raw]}`
     this.item.tooltip = t(
       'lang.toggle.tooltip',
-      t(`lang.toggle.state.${pref}`),
+      t(`lang.toggle.state.${raw}`),
       t(`lang.toggle.state.${next}`)
     )
   }

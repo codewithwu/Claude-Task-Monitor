@@ -44,6 +44,16 @@ export function detectLang(): Lang {
   return vscode.env.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
 
+/**
+ * 从 vscode.env.language 解析 lang,**不读** module override。
+ * 仅供 LangStore.currentLang() 在 pref='auto' 时使用 —— 让 UI 跟随环境,
+ * 不被 module override 残留污染。detectLang() 保留 override 优先语义,
+ * 因为 t() 全局需要 override 生效 (08-23 ui-lang-toggle 的设计选择)。
+ */
+export function detectEnvLang(): Lang {
+  return vscode.env.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+}
+
 export function getMessages(lang: Lang): Record<string, string> {
   return lang === 'zh' ? zh : en
 }

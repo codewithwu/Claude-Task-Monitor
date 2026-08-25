@@ -319,12 +319,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // 错误处理:workspace.getConfiguration().update() 在受限 profile / schema 校验失败时会
   // reject,之前 fire-and-forget 把 Promise 丢给 registerCommand,失败时用户看不到任何
   // 反馈 —— 按钮状态不变,也无 toast。这里 await + try/catch,失败弹错,让用户知道出了啥事。
+  // 08-25 fix:workspace.getConfiguration().update() 可能 reject null/undefined 或非 Error
+  // 对象 (包装库行为),直接 .message 会让错误处理本身抛 TypeError —— 用户反而看不到 toast。
+  // instanceof Error 兜底 + String() 兜底,确保所有 reject 路径都打出反馈。
   const toggleLanguageCommand = vscode.commands.registerCommand('claudeTaskMonitor.toggleLanguage', async () => {
     try {
       await langStore.cycle()
     } catch (e) {
       void vscode.window.showErrorMessage(
-        t('lang.toggle.fail', (e as Error).message ?? String(e))
+        t('lang.toggle.fail', e instanceof Error ? e.message : String(e))
       )
     }
   })
@@ -395,9 +398,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // 新弹的 notification / toast / quickPick 自动用新语言 (它们是事件触发的)。
       // banner 之前漏在重画列表里 —— 切语言后 sidebar 顶部的中文/英文 warning 不会变,
       // 直到下次 reload。applyJqBanner() 内部读 t(),放进来就跟其他 UI 一起刷。
+      //
+      // 'auto' 必须显式清空 override (08-25):LangStore.currentLang() 已对 'auto' 走
+      // detectEnvLang 独立工作,但 spec (.trellis/spec/i18n.md:20) 要求
+      // setLangOverride(undefined) 在 pref=auto 时落地 —— 让 t() 全局也回落到 env。
+      // 否则 'auto' 仅 UI 跟随 env,新弹的 toast/notification 仍读陈旧 override。
       if (e.affectsConfiguration('claudeTaskMonitor.language')) {
         langStore.syncFromConfig()
-        setLangOverride(langStore.currentLang())
+        const newPref = langStore.get()
+        setLangOverride(newPref === 'auto' ? undefined : newPref)
         statusBar.update(store)
         applyBadge(treeView, store)
         applyJqBanner(treeView, hasJq)
