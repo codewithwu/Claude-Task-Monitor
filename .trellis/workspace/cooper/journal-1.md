@@ -167,3 +167,53 @@ Closed 10 verified findings from /code-review @src/ on commit be68481. 7 i18n cl
 - git push origin main (4 commits ahead of origin)
 - Future backlog (out of scope here): extension.ts:deactivate() '是'/'否' buttons + 5 other Chinese toasts (lines 82/89/159/461/468) — see .trellis/spec/i18n.md 'Out of scope' section
 - Future backlog: integration test for cfg onDidChangeConfiguration hot-update path (currently manual-verification only)
+
+
+## Session 4: Address 7 code-review findings on i18n/lang pipeline (round 2)
+
+**Date**: 2026-08-26
+**Task**: Address 7 code-review findings on i18n/lang pipeline (round 2)
+**Branch**: `main`
+
+### Summary
+
+Closed 7 follow-up findings from /code-review @src/ on 2026-08-26 against the 08-25 i18n/lang patch: real bug (extension.ts:330 Error fallback regressed — lost String() fallback when Error.message is null/undefined, leaked {0} template placeholder), duplication (i18n/index.ts detectEnvLang + detectLang both did env.startsWith('zh') verbatim), inconsistency (activation wrote setLangOverride(langStore.currentLang()) while listener wrote undefined for auto), dead code (ui/langToggle.ts unreachable isLangPref defensive branch — getPref typed () => LangPref after 08-25 hardening), spec/code mismatch (langStore.ts:60 JSDoc vs spec on override writer ownership), brittle cite (extension.ts:404 hardcoded spec line :20), test gap (no langToggle.test.ts). Net: +212/-27 across 7 modified + 3 new files. 250/250 tests pass; tsc shows only 4 pre-existing errors on main.
+
+### Main Changes
+
+- fix(i18n): extension.ts:330 toast extracts formatToggleFailMessage helper — String() fallback on both branches of instanceof check (Error.message === null/undefined no longer leaks {0})
+- fix(i18n): i18n/index.ts extracts private fromEnv() helper; detectLang and detectEnvLang both route through it (single source for env-language resolution)
+- fix(i18n): extension.ts activation writes setLangOverride(auto ? undefined : pref), matching the listener pattern; override is consistently undefined for pref='auto' regardless of code path
+- fix(i18n): ui/langToggle.ts deletes unreachable defensive branch (LangStore is data boundary); moves one-time isLangPref check to constructor throw
+- chore(i18n): removes lang.toggle.invalid key from messages/en.ts and messages/zh.ts (no remaining callers; symmetry test still green)
+- docs(spec): i18n.md corrects override ownership paragraph — written by extension.ts config listener, not LangStore (LangStore stays decoupled from i18n for unit-testability, matching langStore.ts:8-9 rationale)
+- chore(docs): extension.ts:404 area replaces brittle ':20' line cite with stable spec/i18n.md#manual-language-override anchor
+- test: src/test/langToggle.test.ts (8 cases) — render with each pref, tooltip composition, render-after-change, dispose, constructor-throw, command, priority
+- test: src/test/formatError.test.ts (13 cases) — Error with normal/empty/null/undefined message, non-Error rejects (string/number/bool/null/undefined/object), {0} never leaks
+- test: src/test/i18n.test.ts +2 FR3 cases — setLangOverride(undefined) + env=en/zh → detectLang returns env
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4f86ab6` | (see git log) |
+
+### Testing
+
+- [OK] pnpm test: 250/250 pass across 18 test files (was 239/239; +11 from formatError + langToggle + i18n additions)
+- [OK] pnpm exec tsc --noEmit: 4 pre-existing errors at extension.ts:241/242/312/461 — identical on main (lines 238/239/309/458 shifted by +3 from FR3 comment); not introduced by this task
+- [OK] grep 'startsWith(.zh.)' src/i18n/index.ts: 1 hit (inside fromEnv; was 2 before refactor)
+- [OK] grep 'lang.toggle.invalid' src/: 0 hits
+- [OK] grep 'i18n.md:20' src/: 0 hits
+- [OK] trellis-check verdict: READY TO COMMIT (10/10 ACs pass, all 3 implement-agent deviations technically correct)
+- [OK] code-review re-verify: CLEAN — all 7 original findings GONE, no net-new issues introduced
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- git push origin main (1 commit ahead of origin: 4f86ab6)
+- Future backlog (out of scope here): extension.ts:deactivate() '是'/'否' buttons + 5 other Chinese toasts (lines 82/89/159/461/468) — see .trellis/spec/i18n.md 'Out of scope' section
+- Future backlog: investigate the 4 pre-existing tsc errors on main (extension.ts:241/242/312/461 — SessionGroup undefined / TreeElement not assignable / FilterMode | undefined / MarkdownString not assignable) — not introduced by this task but should be tracked separately
