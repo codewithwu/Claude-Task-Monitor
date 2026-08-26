@@ -6,8 +6,8 @@
 //   3. 文案量不大(~30 条),手写 enum-like key 集合足够
 //
 // 切换策略:
-//   - vscode.env.language 以 'zh' 开头 → 中文
-//   - 其他 → 英文 (默认 fallback)
+//   - vscode.env.language 以 'zh' 开头 → 中文  (fromEnv, 单一事实源)
+//   - 其他 → 英文 (默认 fallback)             (同上)
 //   - 缺失 key → 返回 key 本身,console.warn 一次 (避免 typo 默默走 fallback)
 //
 // 手动覆盖 (08-23 ui-lang-toggle):
@@ -39,9 +39,13 @@ export function setLangOverride(lang: Lang | undefined): void {
   override = lang
 }
 
-export function detectLang(): Lang {
-  if (override) return override
+/** 从 vscode.env.language 解析 lang。单一事实源:detectLang 和 detectEnvLang 都走这里。 */
+function fromEnv(): Lang {
   return vscode.env.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+}
+
+export function detectLang(): Lang {
+  return override ?? fromEnv()
 }
 
 /**
@@ -51,7 +55,7 @@ export function detectLang(): Lang {
  * 因为 t() 全局需要 override 生效 (08-23 ui-lang-toggle 的设计选择)。
  */
 export function detectEnvLang(): Lang {
-  return vscode.env.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return fromEnv()
 }
 
 export function getMessages(lang: Lang): Record<string, string> {

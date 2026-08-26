@@ -196,3 +196,27 @@ describe('i18n key 对称性', () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
   })
 })
+
+describe('activation pattern (08-26, FR3)', () => {
+  let originalLang: string
+  beforeEach(() => {
+    originalLang = vscode.env.language
+    setLangOverride(undefined)
+  })
+  afterEach(() => {
+    setLang(originalLang)
+    setLangOverride(undefined)
+  })
+
+  it('setLangOverride(undefined) + env=en → detectLang returns en', () => {
+    setLang('en')
+    setLangOverride(undefined)              // simulates extension.ts:80 with pref='auto'
+    expect(detectLang()).toBe('en')
+  })
+
+  it('setLangOverride(undefined) + env=zh → detectLang returns zh', () => {
+    setLang('zh-cn')
+    setLangOverride(undefined)
+    expect(detectLang()).toBe('zh')
+  })
+})

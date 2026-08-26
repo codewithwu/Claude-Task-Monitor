@@ -70,10 +70,6 @@ export const en: Record<string, string> = {
   'lang.toggle.state.zh': 'Chinese',
   'lang.toggle.state.en': 'English',
   'lang.toggle.tooltip': 'UI language: {0}\nClick to switch to {1}\nCommand palette names follow VS Code display language',
-  // 异常兜底:settings.json 手编辑成 enum 之外的值时 (package.json enum 只在 Settings UI
-  // 强制,直接改文件可绕过),LangToggle 显示 '?' 而非 'undefined',tooltip 提示用户点击自愈。
-  // {0} = 原始字符串值
-  'lang.toggle.invalid': "UI language: invalid value '{0}'\nClick to reset to auto",
   // cycle() 失败:workspace config.update() reject (受限 profile / schema 校验失败等)。
   // 之前是 fire-and-forget,失败时用户看到按钮不动且无任何反馈。
   // {0} = 底层错误信息

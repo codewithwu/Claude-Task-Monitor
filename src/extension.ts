@@ -26,6 +26,7 @@ import { LangStore, type LangPref } from './util/langStore.js'
 import { t, setLangOverride } from './i18n/index.js'
 import { applyBadge } from './ui/badge.js'
 import { formatSingleMessage, formatAggregateMessage } from './util/notifyMessage.js'
+import { formatToggleFailMessage } from './util/formatError.js'
 import { LangToggle } from './ui/langToggle.js'
 
 const HOME_DIR = os.homedir()
@@ -77,7 +78,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // applyBadge 等),放此处 (config 读取块末尾) 是最安全的位置。
   const langPref = cfg.get<LangPref>('language', 'auto')
   const langStore = new LangStore(langPref)
-  setLangOverride(langStore.currentLang())
+  // 与 onDidChangeConfiguration 监听器 (L408) 对齐:auto 写 undefined,
+  // 让 t() 全局也回落到 env (spec spec/i18n.md#manual-language-override)
+  setLangOverride(langPref === 'auto' ? undefined : langPref)
 
   fs.mkdirSync(SESSIONS_DIR, { recursive: true })
   fs.mkdirSync(ENDED_DIR, { recursive: true })
@@ -327,7 +330,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await langStore.cycle()
     } catch (e) {
       void vscode.window.showErrorMessage(
-        t('lang.toggle.fail', e instanceof Error ? e.message : String(e))
+        t('lang.toggle.fail', formatToggleFailMessage(e))
       )
     }
   })
@@ -400,7 +403,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // 直到下次 reload。applyJqBanner() 内部读 t(),放进来就跟其他 UI 一起刷。
       //
       // 'auto' 必须显式清空 override (08-25):LangStore.currentLang() 已对 'auto' 走
-      // detectEnvLang 独立工作,但 spec (.trellis/spec/i18n.md:20) 要求
+      // detectEnvLang 独立工作,但 spec (spec/i18n.md#manual-language-override) 要求
       // setLangOverride(undefined) 在 pref=auto 时落地 —— 让 t() 全局也回落到 env。
       // 否则 'auto' 仅 UI 跟随 env,新弹的 toast/notification 仍读陈旧 override。
       if (e.affectsConfiguration('claudeTaskMonitor.language')) {

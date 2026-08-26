@@ -27,6 +27,17 @@ export class LangToggle {
   private readonly item: vscode.StatusBarItem
 
   constructor(private readonly getPref: () => LangPref) {
+    // 防御层 (08-26):getPref 契约是 () => LangPref,但 LangStore 是数据边界 —
+    // 任何绕过 LangStore 的 LangPref 生产者都应在此处早 throw,而不是在
+    // render 每次触发时静默回退 (08-25 之前的 safePref 模式)。
+    // 这一行只跑一次,运行时零开销。
+    const initial = getPref()
+    if (!isLangPref(initial)) {
+      throw new Error(
+        `[claude-task-monitor] LangToggle: getPref() returned invalid value ` +
+        `"${String(initial)}"; LangStore should be the data boundary.`
+      )
+    }
     this.item = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Right,
       99
@@ -42,16 +53,7 @@ export class LangToggle {
    * onDidChangeConfiguration 监听器,见 syncFromConfig + render 链路)。
    */
   render(): void {
-    const raw = this.getPref()
-    if (!isLangPref(raw)) {
-      // 非法 pref:理论上 LangStore 已经过滤了 (构造器 / syncFromConfig 都会校验),
-      // 但渲染层兜底 —— 万一有人直接传非 LangPref 进 LangToggle,这里仍能显示 '?' +
-      // tooltip,而不是字面量 'undefined'。点击 → cycle() 会把任意 pref 推进到
-      // PREF_ORDER[0]='auto' (nextPref: indexOf 不命中 → 0),自愈到合法值。
-      this.item.text = '$(globe) ?'
-      this.item.tooltip = t('lang.toggle.invalid', raw)
-      return
-    }
+    const raw = this.getPref()  // 构造时已校验 (见 constructor)
     const next = nextPref(raw)
     this.item.text = `$(globe) ${LABELS[raw]}`
     this.item.tooltip = t(
