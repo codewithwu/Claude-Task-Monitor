@@ -10,6 +10,7 @@
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { formatErrorMessage } from './formatError.js'
 
 export class MutedStore {
   private map = new Map<string, boolean>()
@@ -44,7 +45,7 @@ export class MutedStore {
         }
       }
     } catch (e) {
-      console.warn(`[claude-task-monitor] muted.json load failed: ${(e as Error).message}`)
+      console.warn(`[claude-task-monitor] muted.json load failed: ${formatErrorMessage(e)}`)
     }
   }
 
@@ -57,7 +58,7 @@ export class MutedStore {
       }
       fs.writeFileSync(this.filePath, JSON.stringify(obj, null, 2))
     } catch (e) {
-      console.warn(`[claude-task-monitor] muted.json persist failed: ${(e as Error).message}`)
+      console.warn(`[claude-task-monitor] muted.json persist failed: ${formatErrorMessage(e)}`)
     }
   }
 }

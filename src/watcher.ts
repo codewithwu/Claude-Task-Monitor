@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { EventEmitter } from 'node:events'
 import chokidar from 'chokidar'
+import { formatErrorMessage } from './util/formatError.js'
 
 type WatcherEvents = {
   fileAdded: [filePath: string]
@@ -90,7 +91,7 @@ export class SessionsWatcher extends EventEmitter<WatcherEvents> {
           const parsed = JSON.parse(line)
           this.emit('line', file, parsed)
         } catch (e) {
-          this.emit('parseError', (e as Error).message, file, line)
+          this.emit('parseError', formatErrorMessage(e), file, line)
         }
       }
       this.offsets.set(file, offset + consumed)

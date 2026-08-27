@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // 桩 vscode 模块:LangToggle 只用到 vscode.window.createStatusBarItem + StatusBarAlignment。
 // language 设为 'en' —— 测试期望英文 tooltip ('UI language: ...' 模板)。
@@ -29,9 +29,8 @@ const mockItem = () => ({
   dispose: vi.fn(),
 })
 
-describe('LangToggle (08-26)', () => {
+describe('LangToggle (08-27)', () => {
   let item: ReturnType<typeof mockItem>
-  let createSpy: MockInstance
 
   beforeEach(() => {
     item = mockItem()
@@ -42,7 +41,6 @@ describe('LangToggle (08-26)', () => {
       item.priority = priority ?? 0
       return item as unknown as vscode.StatusBarItem
     })
-    createSpy = createMock
   })
 
   it('renders auto: text = $(globe) A, show() called', () => {
@@ -55,15 +53,30 @@ describe('LangToggle (08-26)', () => {
   it('renders zh: text = $(globe) 中, tooltip mentions next = en', () => {
     new LangToggle(() => 'zh')
     expect(item.text).toBe('$(globe) 中')
-    // nextPref(zh) = 'en' → tooltip should mention English state
-    expect(item.tooltip).toMatch(/English|英文/)
+    // nextPref(zh) = 'en' → tooltip should mention English state name (env='en' in this file)
+    expect(item.tooltip).toMatch(/English/)
   })
 
   it('renders en: text = $(globe) EN, tooltip mentions next = auto', () => {
     new LangToggle(() => 'en')
     expect(item.text).toBe('$(globe) EN')
-    // nextPref(en) = 'auto' → tooltip should mention Auto state
-    expect(item.tooltip).toMatch(/Auto|自动/)
+    // nextPref(en) = 'auto' → tooltip should mention Auto state name (env='en' in this file)
+    expect(item.tooltip).toMatch(/Auto/)
+  })
+
+  it('renders zh tooltip with Chinese strings when env=zh (08-27, FR8)', () => {
+    // 临时把 env 切到 zh,验证 zh 渲染路径 (Round-2 的 over-broad regex /English|中文/
+    // 让中文分支永远不可达,这条 case 真覆盖中文 tooltip)
+    const originalLang = vscode.env.language
+    Object.defineProperty(vscode.env, 'language', { value: 'zh-cn', configurable: true })
+    try {
+      new LangToggle(() => 'zh')
+      expect(item.text).toBe('$(globe) 中')
+      // nextPref(zh) = 'en' → tooltip 应包含中文 state 名称
+      expect(item.tooltip).toMatch(/中文|英文/)
+    } finally {
+      Object.defineProperty(vscode.env, 'language', { value: originalLang, configurable: true })
+    }
   })
 
   it('render() reflects getter change (no internal caching)', () => {

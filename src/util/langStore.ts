@@ -55,10 +55,12 @@ export class LangStore {
    * - pref='auto' → detectEnvLang() (env only,**不读** module override)
    * - pref='zh'/'en' → 直接返回
    *
-   * 为什么 'auto' 走 detectEnvLang 而非 detectLang:
-   * module override 在 set(zh/en) 时被 setLangOverride 写入,在 set(auto) 时
-   * 必须清空 (由 extension.ts 的 config listener 处理)。走 detectEnvLang 让
-   * LangStore 自己对 'auto' 的语义负责,不依赖外部清空动作。
+   * 注意:LangStore 不写 module override (08-27 FR5 明确化)。
+   * override 由 extension.ts 的 onDidChangeConfiguration 监听器单一写入,
+   * LangStore 保持与 i18n 层解耦 (可单测,无需 mock vscode 状态)。
+   * 'auto' 走 detectEnvLang 是 UI 跟随 env 的语义需要 —— LangToggle 只读
+   * pref,UI 跟随由 detectEnvLang 解析,而 t() 全局则通过
+   * setLangOverride(undefined) 回落 env (见 i18n spec)。
    */
   currentLang(): Lang {
     return this.current === 'auto' ? detectEnvLang() : this.current

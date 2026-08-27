@@ -210,7 +210,7 @@ describe('activation pattern (08-26, FR3)', () => {
 
   it('setLangOverride(undefined) + env=en → detectLang returns en', () => {
     setLang('en')
-    setLangOverride(undefined)              // simulates extension.ts:80 with pref='auto'
+    setLangOverride(undefined)              // simulates extension.ts:83 with pref='auto'
     expect(detectLang()).toBe('en')
   })
 
@@ -218,5 +218,18 @@ describe('activation pattern (08-26, FR3)', () => {
     setLang('zh-cn')
     setLangOverride(undefined)
     expect(detectLang()).toBe('zh')
+  })
+
+  it('activation with invalid cfg normalizes through langStore.get() (08-27, FR1)', async () => {
+    setLang('en')
+    // LangStore 构造器对非法 pref 回落 'auto' (warn suppressed by vi.spyOn if needed)
+    const { LangStore } = await import('../util/langStore.js')
+    const langStore = new LangStore('fr' as unknown as ConstructorParameters<typeof LangStore>[0])
+    expect(langStore.get()).toBe('auto')
+    // Activation 模式 (FR1 后):读 langStore.get() 而非 raw langPref
+    const effective = langStore.get()
+    setLangOverride(effective === 'auto' ? undefined : effective)
+    // setLangOverride 写入 undefined → detectLang 回落 env
+    expect(detectLang()).toBe('en')
   })
 })

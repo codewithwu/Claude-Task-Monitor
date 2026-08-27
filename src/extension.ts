@@ -26,7 +26,7 @@ import { LangStore, type LangPref } from './util/langStore.js'
 import { t, setLangOverride } from './i18n/index.js'
 import { applyBadge } from './ui/badge.js'
 import { formatSingleMessage, formatAggregateMessage } from './util/notifyMessage.js'
-import { formatToggleFailMessage } from './util/formatError.js'
+import { formatErrorMessage } from './util/formatError.js'
 import { LangToggle } from './ui/langToggle.js'
 
 const HOME_DIR = os.homedir()
@@ -78,9 +78,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // applyBadge 等),放此处 (config 读取块末尾) 是最安全的位置。
   const langPref = cfg.get<LangPref>('language', 'auto')
   const langStore = new LangStore(langPref)
-  // 与 onDidChangeConfiguration 监听器 (L408) 对齐:auto 写 undefined,
-  // 让 t() 全局也回落到 env (spec spec/i18n.md#manual-language-override)
-  setLangOverride(langPref === 'auto' ? undefined : langPref)
+  // 与 onDidChangeConfiguration 监听器 (L412) 对齐:auto 写 undefined,
+  // 让 t() 全局也回落到 env (spec .trellis/spec/i18n.md#manual-language-override-08-23-ui-lang-toggle)
+  // 读 langStore.get() 而非 langPref:LangStore 构造器对非法 cfg 已回落到 'auto',
+  // 必须走规范化后的值,否则 setLangOverride 会写入 'fr' 之类的非法字符串 (08-27 FR1)。
+  const effective = langStore.get()
+  setLangOverride(effective === 'auto' ? undefined : effective)
 
   fs.mkdirSync(SESSIONS_DIR, { recursive: true })
   fs.mkdirSync(ENDED_DIR, { recursive: true })
@@ -168,7 +171,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   try {
     await watcher.start()
   } catch (e) {
-    void vscode.window.showErrorMessage(`Claude Task Monitor: 启动 watcher 失败：${(e as Error).message}`)
+    void vscode.window.showErrorMessage(`Claude Task Monitor: 启动 watcher 失败：${formatErrorMessage(e)}`)
     return
   }
 
@@ -330,7 +333,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await langStore.cycle()
     } catch (e) {
       void vscode.window.showErrorMessage(
-        t('lang.toggle.fail', formatToggleFailMessage(e))
+        t('lang.toggle.fail', formatErrorMessage(e))
       )
     }
   })
@@ -403,7 +406,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // 直到下次 reload。applyJqBanner() 内部读 t(),放进来就跟其他 UI 一起刷。
       //
       // 'auto' 必须显式清空 override (08-25):LangStore.currentLang() 已对 'auto' 走
-      // detectEnvLang 独立工作,但 spec (spec/i18n.md#manual-language-override) 要求
+      // detectEnvLang 独立工作,但 spec (.trellis/spec/i18n.md#manual-language-override-08-23-ui-lang-toggle) 要求
       // setLangOverride(undefined) 在 pref=auto 时落地 —— 让 t() 全局也回落到 env。
       // 否则 'auto' 仅 UI 跟随 env,新弹的 toast/notification 仍读陈旧 override。
       if (e.affectsConfiguration('claudeTaskMonitor.language')) {
@@ -446,7 +449,7 @@ function installHookAssets(context: vscode.ExtensionContext): { ok: boolean; err
     }
     return { ok: true }
   } catch (e) {
-    return { ok: false, error: (e as Error).message }
+    return { ok: false, error: formatErrorMessage(e) }
   }
 }
 
@@ -524,7 +527,7 @@ function archiveSessionNow(s: SessionState): void {
     const target = path.join(ENDED_DIR, `${s.sessionId}-${Date.now()}-${randomUUID().slice(0, 8)}.jsonl`)
     fs.renameSync(jsonlPath, target)
   } catch (e) {
-    void vscode.window.showErrorMessage(`Claude Task Monitor: 归档失败:${(e as Error).message}`)
+    void vscode.window.showErrorMessage(`Claude Task Monitor: 归档失败:${formatErrorMessage(e)}`)
   }
 }
 
@@ -540,12 +543,12 @@ function bootstrapExistingFiles(sessionsDir: string, watcher: SessionsWatcher, s
         try {
           store.apply(JSON.parse(line) as HookPayload)
         } catch (e) {
-          console.warn(`[claude-task-monitor] bootstrap parse error in ${full}: ${(e as Error).message}`)
+          console.warn(`[claude-task-monitor] bootstrap parse error in ${full}: ${formatErrorMessage(e)}`)
         }
       }
       watcher.setOffset(full, Buffer.byteLength(content, 'utf8'))
     } catch (e) {
-      console.warn(`[claude-task-monitor] bootstrap read error for ${full}: ${(e as Error).message}`)
+      console.warn(`[claude-task-monitor] bootstrap read error for ${full}: ${formatErrorMessage(e)}`)
     }
   }
 }

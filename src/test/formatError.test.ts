@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { formatToggleFailMessage } from '../util/formatError.js'
+import { formatErrorMessage } from '../util/formatError.js'
 
-describe('formatToggleFailMessage (08-26)', () => {
+describe('formatErrorMessage (08-27)', () => {
   it.each<[unknown, string]>([
     [new Error('boom'), 'boom'],
     [new TypeError('bad type'), 'bad type'],
-    [new Error(), ''],                              // default message → '' (e.message === '')
+    [new Error(), 'Error'],                          // 08-27 FR3:?? → ||,default message '' 落到 String(e)='Error'
     [{ message: 'string-coerced' }, '[object Object]'], // non-Error with message: instanceof false → String(e)
     [{ message: null }, '[object Object]'],
     [{ message: undefined }, '[object Object]'],
@@ -15,14 +15,18 @@ describe('formatToggleFailMessage (08-26)', () => {
     [42, '42'],
     [true, 'true'],
   ])('formats %p → %p', (input, expected) => {
-    expect(formatToggleFailMessage(input)).toBe(expected)
+    expect(formatErrorMessage(input)).toBe(expected)
   })
 
   it('never returns the literal {0} template placeholder', () => {
-    expect(formatToggleFailMessage(new Error())).not.toContain('{0}')
-    expect(formatToggleFailMessage({ message: null })).not.toContain('{0}')
-    expect(formatToggleFailMessage(undefined)).not.toContain('{0}')
-    expect(formatToggleFailMessage(null)).not.toContain('{0}')
+    expect(formatErrorMessage(new Error())).not.toContain('{0}')
+    expect(formatErrorMessage({ message: null })).not.toContain('{0}')
+    expect(formatErrorMessage(undefined)).not.toContain('{0}')
+    expect(formatErrorMessage(null)).not.toContain('{0}')
+  })
+
+  it('returns "Error" for new Error() with default empty message (08-27, FR3)', () => {
+    expect(formatErrorMessage(new Error())).toBe('Error')
   })
 
   it('handles Error subclass with undefined message', () => {
@@ -32,6 +36,6 @@ describe('formatToggleFailMessage (08-26)', () => {
         this.message = undefined as unknown as string
       }
     }
-    expect(formatToggleFailMessage(new CustomError())).toBe('Error')
+    expect(formatErrorMessage(new CustomError())).toBe('Error')
   })
 })
