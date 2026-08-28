@@ -7,6 +7,44 @@
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-08-28
+
+### Fixed
+
+- **i18n lang pipeline round 4 加固，4 处 code-review 落实**（commit `0a3dc0c`）:
+  - **`formatErrorMessage` 增加 duck-typed `{ message: string }` 分支**
+    （`src/util/formatError.ts`）：受限 profile 下
+    `workspace.getConfiguration().update()` 抛非 Error rejection
+    （如 `{ message: 'Config is system-controlled' }`）时不再渲染成
+    `[object Object]`。`instanceof Error` 优先判定保持，`String(e)` 兜底
+    保持；只新增 `typeof e === 'object' && e !== null && typeof e.message === 'string'`
+    中间分支返回 `e.message`，跟 `langStore.test.ts` 等老测试期望对齐。
+  - **`LangToggle` 构造器改 fail-soft**（`src/ui/langToggle.ts`）：LangStore
+    一次数据边界回归不应让整个 extension 关掉。非法 pref 不再 throw，
+    改为 `console.warn` 一次 + 按钮降级显示 `$(globe) ?` + invalid
+    tooltip（重新启用 `lang.toggle.invalid` i18n key，分别 zh/en 翻译：
+    `语言偏好无效: {0}(等待下次同步自愈)` /
+    `Invalid language preference: {0} (will self-heal on next sync)`），
+    等待下次 `onDidChangeConfiguration` sync 自然自愈。
+  - **`i18n.test.ts` 抑制 LangStore 构造器 warn 泄漏**
+    （`src/test/i18n.test.ts`）：activation 测试构造 `LangStore('fr', ...)`
+    时缺 `vi.spyOn(console, 'warn').mockImplementation(() => {})`，
+    `console.warn('[claude-task-monitor] LangStore: invalid pref "fr"...')`
+    漏到 vitest stderr。补 spy + `mockRestore()`，复刻
+    `langStore.test.ts:160-186` 的标准范式。
+  - **`extension.deactivate()` catch 走 `formatErrorMessage`**
+    （`src/extension.ts:495-497`）：之前是 extension.ts 唯一一条没走
+    helper 的 catch，违反 `formatError.ts` 文件头注释里
+    "all catches covered" 的承诺。改 `console.warn('[claude-task-monitor]
+    uninstall failed:', formatErrorMessage(e))`，grep `catch (` +
+    `console.warn` 验证全 extension.ts 覆盖 100%。
+
+### Testing
+
+- `pnpm test`: 254/254 pass（+1 self-heal：formatError duck-typed case 把
+  原期望 `[object Object]` 更新为 `'string-coerced'`）。
+- `pnpm build`: green，`dist/extension.js` 239.54 KB。
+
 ## [0.3.3] - 2026-08-27
 
 ### Fixed
@@ -145,7 +183,8 @@
 - 单元测试总数保持 204（未新增用例,但 `i18n.test.ts` 的 override block 现在测试
   间状态隔离正确,不再有顺序敏感 flaky 风险）
 
-[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/codewithwu/Claude-Task-Monitor/compare/v0.3.0...v0.3.1
