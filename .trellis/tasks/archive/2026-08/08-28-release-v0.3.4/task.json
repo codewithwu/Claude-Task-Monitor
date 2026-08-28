@@ -1,0 +1,30 @@
+{
+  "id": "release-v0.3.4",
+  "name": "release-v0.3.4",
+  "title": "Release v0.3.4 (round-4 i18n fixes)",
+  "description": "Bump to v0.3.4 + publish Open VSX + GitHub release. Includes round-4 i18n code-review fixes (4 findings) from fix/08-28-round4-i18n-review-fixes branch.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "cooper",
+  "assignee": "cooper",
+  "createdAt": "2026-08-28",
+  "completedAt": "2026-08-28",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-28-bump-and-build-0.3.4",
+    "08-28-publish-openvsx-0.3.4",
+    "08-28-github-release-0.3.4"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
