@@ -222,14 +222,20 @@ describe('activation pattern (08-26, FR3)', () => {
 
   it('activation with invalid cfg normalizes through langStore.get() (08-27, FR1)', async () => {
     setLang('en')
-    // LangStore 构造器对非法 pref 回落 'auto' (warn suppressed by vi.spyOn if needed)
-    const { LangStore } = await import('../util/langStore.js')
-    const langStore = new LangStore('fr' as unknown as ConstructorParameters<typeof LangStore>[0])
-    expect(langStore.get()).toBe('auto')
-    // Activation 模式 (FR1 后):读 langStore.get() 而非 raw langPref
-    const effective = langStore.get()
-    setLangOverride(effective === 'auto' ? undefined : effective)
-    // setLangOverride 写入 undefined → detectLang 回落 env
-    expect(detectLang()).toBe('en')
+    // 08-28 F3:挡 LangStore 构造器的 warn 落到 vitest stderr
+    // (复刻 langStore.test.ts:160-186 的 spy/mockRestore 范式)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { LangStore } = await import('../util/langStore.js')
+      const langStore = new LangStore('fr' as unknown as ConstructorParameters<typeof LangStore>[0])
+      expect(langStore.get()).toBe('auto')
+      // Activation 模式 (FR1 后):读 langStore.get() 而非 raw langPref
+      const effective = langStore.get()
+      setLangOverride(effective === 'auto' ? undefined : effective)
+      // setLangOverride 写入 undefined → detectLang 回落 env
+      expect(detectLang()).toBe('en')
+    } finally {
+      warnSpy.mockRestore()
+    }
   })
 })

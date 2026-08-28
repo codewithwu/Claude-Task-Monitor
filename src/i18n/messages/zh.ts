@@ -73,5 +73,8 @@ export const zh: Record<string, string> = {
   // cycle() 失败:workspace config.update() reject (受限 profile / schema 校验失败等)。
   // 之前是 fire-and-forget,失败时用户看到按钮不动且无任何反馈。
   // {0} = 底层错误信息
-  'lang.toggle.fail': '切换界面语言失败:{0}'
+  'lang.toggle.fail': '切换界面语言失败:{0}',
+  // 08-28 F2 fail-soft:LangStore 数据边界回归时,getPref() 透出非法值,
+  // 按钮降级显示 ? + 此 tooltip。{0} = 原始非法值字符串。
+  'lang.toggle.invalid': '语言偏好无效: {0}(等待下次同步自愈)'
 }
