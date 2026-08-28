@@ -99,10 +99,38 @@ describe('LangToggle (08-27)', () => {
     expect(item.dispose).toHaveBeenCalledTimes(1)
   })
 
-  it('constructor throws if getPref returns invalid value (defense shift, R1)', () => {
-    expect(() =>
-      new LangToggle(() => 'fr' as unknown as LangPref)
-    ).toThrow(/LangToggle/)
+  it('constructor fails soft on invalid pref: warns once, renders degraded UI (08-28 F2)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const t = new LangToggle(() => 'fr' as unknown as LangPref)
+      // 08-28 F2:构造器不再 throw,extension.activate() 不会被这一次回归拖垮
+      expect(t).toBeInstanceOf(LangToggle)
+      // 构造器 warn 一次,描述异常 + 提示自愈路径
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy.mock.calls[0][0]).toMatch(/LangToggle.*invalid value.*fr/)
+      // render() 走降级分支:文本 '$(globe) ?',tooltip 是 lang.toggle.invalid (env='en')
+      expect(item.text).toBe('$(globe) ?')
+      expect(item.tooltip).toMatch(/Invalid language preference/)
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('render() self-heals to normal UI when getPref returns valid value (08-28 F2)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      let pref: LangPref | string = 'fr'  // 首次非法
+      const t = new LangToggle(() => pref as LangPref)
+      expect(item.text).toBe('$(globe) ?')
+
+      // 模拟 LangStore.set() 成功后 onDidChangeConfiguration 触发新 render →
+      // getPref() 返回合法值,render() 走正常分支
+      pref = 'zh'
+      t.render()
+      expect(item.text).toBe('$(globe) 中')
+    } finally {
+      warnSpy.mockRestore()
+    }
   })
 
   it('command is set to claudeTaskMonitor.toggleLanguage', () => {

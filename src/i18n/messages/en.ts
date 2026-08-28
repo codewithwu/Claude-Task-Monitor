@@ -73,5 +73,8 @@ export const en: Record<string, string> = {
   // cycle() 失败:workspace config.update() reject (受限 profile / schema 校验失败等)。
   // 之前是 fire-and-forget,失败时用户看到按钮不动且无任何反馈。
   // {0} = 底层错误信息
-  'lang.toggle.fail': 'Failed to switch UI language: {0}'
+  'lang.toggle.fail': 'Failed to switch UI language: {0}',
+  // 08-28 F2 fail-soft:LangStore data boundary regression where getPref() exposes
+  // an invalid value; button degrades to ? + this tooltip. {0} = raw invalid value.
+  'lang.toggle.invalid': 'Invalid language preference: {0} (will self-heal on next sync)'
 }

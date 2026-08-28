@@ -493,7 +493,7 @@ export async function deactivate(): Promise<void> {
     }
     if (fs.existsSync(HOOK_SCRIPT)) fs.unlinkSync(HOOK_SCRIPT)
   } catch (e) {
-    console.warn('[claude-task-monitor] uninstall failed:', e)
+    console.warn('[claude-task-monitor] uninstall failed:', formatErrorMessage(e))
   }
 }
 
