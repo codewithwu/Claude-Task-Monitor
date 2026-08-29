@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/i18n.md", "reason": "After i18n key additions, verify Object.keys(en).sort() === Object.keys(zh).sort() (symmetry test in src/test/i18n.test.ts)."}
+{"file": ".trellis/spec/testing.md", "reason": "Verify treeDataProvider.test.ts uses correct vi.mock('vscode') pattern; watcher.test.ts cleanup of mkdtempSync + rmSync; rowPresentation.test.ts vi.mock vscode env.language."}
+{"file": ".trellis/spec/lifecycle.md", "reason": "Verify deactivate() is no longer async (no Promise<void> return) and uses fire-and-forget .then() — VS Code best practice."}
+{"file": ".trellis/spec/architecture.md", "reason": "Verify treeDataProvider.buildTooltip boundary (user-input via appendText, controlled strings via appendMarkdown) doesn't leak MarkdownString escape responsibility outside the rendering layer."}

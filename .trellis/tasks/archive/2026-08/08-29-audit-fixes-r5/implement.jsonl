@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/i18n.md", "reason": "Add 5 new i18n keys (status.dying, extension.uninstall.{prompt,remove,keep}, extension.jqMissing); must be added to BOTH en.ts and zh.ts; symmetry test enforces parity."}
+{"file": ".trellis/spec/testing.md", "reason": "Use vi.mock('vscode', ...) for treeDataProvider.test.ts (markdown-string escape test); watcher.test.ts uses real fs.mkdtempSync (no chokidar mock)."}
+{"file": ".trellis/spec/lifecycle.md", "reason": "deactivate() must not block on interactive UI per VS Code extension guidelines; convert async/await to fire-and-forget with .then()."}
+{"file": ".trellis/spec/architecture.md", "reason": "Verify treeDataProvider changes don't violate tree view layer boundary; formatError remains a pure util (already correct)."}
