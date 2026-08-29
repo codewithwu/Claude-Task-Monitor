@@ -7,6 +7,66 @@
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-08-29
+
+### Fixed
+
+- **audit-r5: 3 core bugs**（commit `9ae6ae1`，round-5 5-agent 并行 src/ audit）:
+  - **`formatError.ts:30` duck-typed `{message: ''}` 分支返回空串违反文件头契约**
+    （`src/util/formatError.ts`）：文件头注释明确写"每一段都保证 t() 拿到非空字符串"，
+    但 `typeof e === 'object' && e.message === 'string'` 这条路径在 `e.message === ''`
+    时返回 `''`。镜像 `Error` 分支的 `|| String(e)` 兜底——空 message 落到
+    `String({message: ''}) === '[object Object]'`，既非空也携带可读线索。
+    新增 `formatError.test.ts` 用例 `[{message: ''} → '[object Object]']`。
+  - **`watcher.ts:77` JSONL truncation 没重置 offsets map 导致下次仍早退**
+    （`src/watcher.ts`）：`stat.size < offset`（truncate、fsync rollback 等）路径只
+    early-return 没更新 map entry，map 跨 change event 持久，truncate + append 后
+    下次 `size === offset` 仍命中早退分支，新内容永远读不到。改成同时重置 local
+    `offset` 和 `offsets.set(file, 0)`，下次 change event 把 `[0..stat.size]` 完整
+    重新读。新增 `watcher.test.ts` 用例 `truncateSync+append`。
+  - **`treeDataProvider.ts:102` buildTooltip 用 `appendMarkdown` 渲染非受信用户输入**
+    （`src/ui/treeDataProvider.ts`）：`MarkdownString.appendMarkdown` 不转义 markdown
+    语法，钩子 payload 里 `[Click](https://evil)` 直接渲染成可点链接注入到 sidebar
+    tooltip。**`lastUserPrompt` / `currentTool.input` 切换到 `MarkdownString.appendText`**
+    （literal chars，不解析 markdown）。受控字符串（`basename` / `statusLabel` /
+    `sessionId` / cwd code block）继续走 `appendMarkdown`。新增
+    `treeDataProvider.test.ts`，用 `vi.mock'd MarkdownString` spy
+    `appendText` vs `appendMarkdown` 调用次数。
+- **i18n: 3 hardcoded Chinese strings**（commit `ce29ef7`，round-5 audit）:
+  - **`rowPresentation.ts:77` dyingAt 行描述前缀硬编码 `'已退出 · '`**
+    （`src/ui/rowPresentation.ts`）：en 用户在 sidebar 看到中文。新增 `status.dying`
+    i18n key（en: `'Exited'`、zh: `'已退出'`），现有 `rowPresentation.test.ts`
+    `dyingAt 有值` 用例继续在 zh-cn mock 下 pass。
+  - **`extension.ts:482` `deactivate()` uninstall prompt + `'是/否'` 按钮硬编码中文**
+    （`src/extension.ts`）：新增 `extension.uninstall.{prompt, remove, keep}` keys。
+    **同步修 blocking-modal bug**：VS Code best practice 是 `deactivate()` 不能 await
+    交互 UI，否则 extension host 关闭会卡住导致 uninstall cleanup 丢失。把
+    `async/await` 改成 fire-and-forget `.then()`，UI 弹窗在后台异步处理，host
+    关闭路径不阻塞。
+  - **`extension.ts:97` activate-time jq-missing toast 硬编码中文**
+    （`src/extension.ts`）：新增 `extension.jqMissing` key。shell 命令（brew / apt）
+    不翻译——是命令标识符不是文案。
+  - **Override note**：items 2、3 之前在 `08-23-fix-v020-leftovers` 中主动 deferred，
+    本次按 round-5 priority list 显式 override。`i18n.test.ts` symmetry test
+    （en ↔ zh key sets equal）继续 pass。
+
+### Docs
+
+- **spec: 落 round-5 audit 两条 pattern**（commit `a6cb01f`，无 src 改动）:
+  - `.trellis/spec/ingest.md` — Watcher.readNew truncation recovery 契约：`stat.size < offset`
+    时同时重置 local offset AND offsets map entry 到 0；只更新 local var 不够，
+    map 跨 change event 持久，下次 append 仍 size===offset 早退。
+  - `.trellis/spec/lifecycle.md` — MarkdownString.appendText vs appendMarkdown 边界：
+    受控字符串（basename / statusLabel / sessionId）继续 appendMarkdown；非受信
+    hook payload 字符串（`lastUserPrompt`、`currentTool.name`、`currentTool.input`）
+    必须 appendText，不解析 markdown 语法，防止 link / image 注入。
+
+### Testing
+
+- `pnpm test`: 260/260 pass（round-5 自检，与 `9ae6ae1` / `ce29ef7` commit message
+  声明一致）。
+- `pnpm build`: green，`dist/extension.js` 生成成功。
+
 ## [0.3.4] - 2026-08-28
 
 ### Fixed
