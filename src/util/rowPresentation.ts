@@ -74,7 +74,7 @@ export function renderRowPresentation(
     : projectName
 
   // description: dying 时加 "已退出" 前缀 + 等待时长;正常时 status + tool + duration
-  const dyingPrefix = dying ? '已退出 · ' : ''
+  const dyingPrefix = dying ? t('status.dying') + ' · ' : ''
   const toolPart = (s.status === 'waiting' && s.currentTool && !dying) ? ` · ${s.currentTool.name}` : ''
   const description = `${dyingPrefix}${statusLabel(s.status)}${toolPart} · ${humanizeDuration(safeElapsed)}`
 

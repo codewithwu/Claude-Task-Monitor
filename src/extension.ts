@@ -94,9 +94,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // hook.sh 第一行就是 `jq -r '.session_id // empty'`,没 jq 直接 exit,
     // 用户看不到任何 session 还要被「hook 已安装」误导。
     // onboarding 弹窗会引导用户装 jq 并提供复制命令。
-    void vscode.window.showErrorMessage(
-      'Claude Task Monitor: `jq` 未在 PATH 中找到。请先安装：macOS `brew install jq`，Debian/Ubuntu `apt install jq`。hook 安装已跳过,装好 jq 后重启 VS Code 即可。'
-    )
+    void vscode.window.showErrorMessage(t('extension.jqMissing'))
   } else {
     // 首次自动安装 hook (失败只 toast,不阻塞后续)
     const initialInstall = installHookAssets(context)
@@ -479,22 +477,29 @@ async function pickFilterMode(): Promise<FilterMode | undefined> {
   return picked?.mode
 }
 
-export async function deactivate(): Promise<void> {
-  const choice = await vscode.window.showInformationMessage(
-    'Claude Task Monitor 卸载：是否同时移除已注入的 hooks 与 hook.sh？',
-    '是', '否'
-  )
-  if (choice !== '是') return
-  try {
-    if (fs.existsSync(CLAUDE_SETTINGS)) {
-      const existing = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8'))
-      const cleaned = uninstallSettings(existing)
-      fs.writeFileSync(CLAUDE_SETTINGS, JSON.stringify(cleaned, null, 2))
+export function deactivate(): void {
+  // 不 await:VS Code 卸载时扩展宿主可能被强制关闭,未 resolve 的 Promise
+  // 会被丢弃,导致 hook 清理静默跳过。fire-and-forget + best-effort fs cleanup
+  // 是文档推荐的模式 (08-29 R4)。
+  const removeLabel = t('extension.uninstall.remove')
+  const keepLabel = t('extension.uninstall.keep')
+  void vscode.window.showInformationMessage(
+    t('extension.uninstall.prompt'),
+    removeLabel,
+    keepLabel
+  ).then((choice) => {
+    if (choice !== removeLabel) return
+    try {
+      if (fs.existsSync(CLAUDE_SETTINGS)) {
+        const existing = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8'))
+        const cleaned = uninstallSettings(existing)
+        fs.writeFileSync(CLAUDE_SETTINGS, JSON.stringify(cleaned, null, 2))
+      }
+      if (fs.existsSync(HOOK_SCRIPT)) fs.unlinkSync(HOOK_SCRIPT)
+    } catch (e) {
+      console.warn('[claude-task-monitor] uninstall failed:', formatErrorMessage(e))
     }
-    if (fs.existsSync(HOOK_SCRIPT)) fs.unlinkSync(HOOK_SCRIPT)
-  } catch (e) {
-    console.warn('[claude-task-monitor] uninstall failed:', formatErrorMessage(e))
-  }
+  })
 }
 
 function archiveStaleFiles(sessionsDir: string, endedDir: string, staleHours: number): void {

@@ -18,6 +18,8 @@ export const zh: Record<string, string> = {
   'status.label.waiting': '等待权限',
   'status.label.running': '运行中',
   'status.label.idle': '待命',
+  // 08-29 R5a: dyingAt 状态行 prefix (liveness 检测到进程死亡,等待 2s 视觉反馈)
+  'status.dying': '已退出',
 
   // ─── notifications row / sidebar 状态 (single / aggregate) ───
   'notify.single': '{0} 等待权限确认：{1}',
@@ -76,5 +78,14 @@ export const zh: Record<string, string> = {
   'lang.toggle.fail': '切换界面语言失败:{0}',
   // 08-28 F2 fail-soft:LangStore 数据边界回归时,getPref() 透出非法值,
   // 按钮降级显示 ? + 此 tooltip。{0} = 原始非法值字符串。
-  'lang.toggle.invalid': '语言偏好无效: {0}(等待下次同步自愈)'
+  'lang.toggle.invalid': '语言偏好无效: {0}(等待下次同步自愈)',
+
+  // ─── extension lifecycle (activate/deactivate) ───
+  // 08-29 R5b:deactivate() 卸载确认提示 + 按钮 (override 08-23 任务的 deferred 决策)
+  'extension.uninstall.prompt': 'Claude Task Monitor:卸载——是否同时移除已注入的 hooks 与 hook.sh?',
+  'extension.uninstall.remove': '是',
+  'extension.uninstall.keep': '否',
+  // 08-29 R5c:activate 时检测不到 jq 的 toast (override 08-23 deferred)
+  // shell 命令保持不翻译 —— 是 shell 标识符
+  'extension.jqMissing': 'Claude Task Monitor:`jq` 未在 PATH 中找到。请先安装:macOS `brew install jq`,Debian/Ubuntu `apt install jq`。hook 安装已跳过,装好 jq 后重启 VS Code 即可。'
 }

@@ -18,6 +18,8 @@ export const en: Record<string, string> = {
   'status.label.waiting': 'Waiting',
   'status.label.running': 'Running',
   'status.label.idle': 'Idle',
+  // 08-29 R5a: dyingAt 状态行 prefix (liveness 检测到进程死亡,等待 2s 视觉反馈)
+  'status.dying': 'Exited',
 
   // ─── notifications row / sidebar 状态 (single / aggregate) ───
   'notify.single': '{0} waiting for permission: {1}',
@@ -76,5 +78,14 @@ export const en: Record<string, string> = {
   'lang.toggle.fail': 'Failed to switch UI language: {0}',
   // 08-28 F2 fail-soft:LangStore data boundary regression where getPref() exposes
   // an invalid value; button degrades to ? + this tooltip. {0} = raw invalid value.
-  'lang.toggle.invalid': 'Invalid language preference: {0} (will self-heal on next sync)'
+  'lang.toggle.invalid': 'Invalid language preference: {0} (will self-heal on next sync)',
+
+  // ─── extension lifecycle (activate/deactivate) ───
+  // 08-29 R5b:deactivate() 卸载确认提示 + 按钮 (override 08-23 任务的 deferred 决策)
+  'extension.uninstall.prompt': 'Claude Task Monitor: uninstall — also remove the injected hooks and hook.sh?',
+  'extension.uninstall.remove': 'Remove',
+  'extension.uninstall.keep': 'Keep',
+  // 08-29 R5c:activate 时检测不到 jq 的 toast (override 08-23 deferred)
+  // shell 命令 (brew install jq / apt install jq) 保持不翻译 —— 是 shell 标识符
+  'extension.jqMissing': 'Claude Task Monitor: `jq` not found in PATH. Please install: macOS `brew install jq`, Debian/Ubuntu `apt install jq`. Hook installation skipped; restart VS Code after installing jq.'
 }
