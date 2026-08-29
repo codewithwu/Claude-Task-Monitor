@@ -89,6 +89,29 @@ The trick that makes this work:
 - For each complete line, `JSON.parse` and emit `'line'`. On parse failure emit `'parseError'`.
 - Update `offsets` to `offset + consumed` where `consumed` is `Buffer.byteLength(line) + 1` per line (the +1 is the `\n`). This is critical: forgetting the +1 makes the next read overlap by one byte and produce duplicate events.
 
+### Truncation recovery (`stat.size < offset`) — 08-29 R3
+
+When `statSync` returns a size smaller than the saved offset (`truncate -s N`, writer-side rollback, partial fsync fail), the naive early-return loses the new content forever — until the file is deleted and recreated.
+
+The fix (in `readNew`):
+
+```ts
+let offset = this.offsets.get(file) ?? 0
+if (stat.size < offset) {
+  // 文件被截断;从头重新读,emit 的事件对 stateManager 是新的
+  offset = 0
+  this.offsets.set(file, 0)   // 必须同步重置 map,否则下次 change 在 stat.size === offset 时仍会早返
+}
+if (stat.size === offset) return
+```
+
+Two non-obvious points:
+
+1. **Update the offsets map too**, not just the local `offset` var. The map persists across `change` events; without the `set(file, 0)` call, the next change after a `truncate → append` will see `stat.size === offset` and return without reading.
+2. **State idempotency**: emitting events from byte 0 of the truncated file may replay lines the stateManager already saw. The reducer is built idempotent-friendly (each event type's reduce returns the same result for the same prev), so duplicate inputs converge. No special signal is needed.
+
+Regression test: `src/test/watcher.test.ts > 文件被截断后从头重新读取,不丢失新内容`.
+
 ### Events
 
 | chokidar event | watcher emits | Notes |

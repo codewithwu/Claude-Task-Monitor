@@ -87,6 +87,11 @@ Adapter from `SessionStore` to `vscode.TreeDataProvider<SessionState>`. Three re
 - **Don't pull more data into `SessionState` for the tooltip.** Render-time formatting (`humanizeDuration`, `JSON.stringify(currentTool.input)`) belongs in the provider.
 - **Don't bypass `store.onChange` and call `refresh()` from inside `apply()`.** Listeners fire synchronously inside `apply()`; calling `refresh()` from the watcher or anywhere else creates a double-fire race.
 - **Don't add sub-nodes.** The tree is intentionally flat. Per-session tool-call history was considered and rejected — it turns the sidebar into a log viewer.
+- **Don't mix controlled and untrusted data in `MarkdownString.appendMarkdown`.** The tooltip composes both:
+  - Controlled (basename, statusLabel, sessionId, cwd) — safe to render as markdown (links, code blocks).
+  - Untrusted (`lastUserPrompt`, `currentTool.name`, `currentTool.input`) — comes from JSONL hook payloads, content is attacker-controllable (a user prompt can be `[Click here](https://evil.example/p)`).
+
+  `appendMarkdown` does not escape markdown syntax; an untrusted payload renders as a clickable link. **Untrusted fields must use `MarkdownString.appendText`** (literal characters, no markdown parsing). Regression test: `src/test/treeDataProvider.test.ts`.
 
 ---
 
