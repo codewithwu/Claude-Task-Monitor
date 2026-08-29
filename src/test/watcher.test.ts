@@ -96,4 +96,22 @@ describe('SessionsWatcher', () => {
     await wait(200)
     expect(events.filter(e => e.includes('.ended'))).toHaveLength(0)
   })
+
+  it('文件被截断后从头重新读取,不丢失新内容', async () => {
+    // 08-29 R3:watcher.ts:77 修复前,文件被 truncate 到 0 后再 append,
+    // 旧代码 stat.size(0) <= offset(...) 直接 return,新内容永久丢失。
+    const lines: any[] = []
+    watcher = new SessionsWatcher(tmpDir)
+    watcher.on('line', (_, parsed) => lines.push(parsed))
+    await watcher.start()
+    const file = path.join(tmpDir, 's1.jsonl')
+    fs.writeFileSync(file, JSON.stringify({ a: 1 }) + '\n')
+    await wait(150)
+    // truncate 到 0
+    fs.truncateSync(file, 0)
+    await wait(150)
+    fs.appendFileSync(file, JSON.stringify({ a: 2 }) + '\n')
+    await wait(200)
+    expect(lines.map(l => l.a)).toEqual([1, 2])
+  })
 })

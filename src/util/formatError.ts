@@ -27,7 +27,7 @@ export function formatErrorMessage(e: unknown): string {
     'message' in e &&
     typeof (e as { message: unknown }).message === 'string'
   ) {
-    return (e as { message: string }).message
+    return (e as { message: string }).message || String(e)
   }
   return String(e)
 }

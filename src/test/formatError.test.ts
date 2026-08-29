@@ -7,6 +7,7 @@ describe('formatErrorMessage (08-27)', () => {
     [new TypeError('bad type'), 'bad type'],
     [new Error(), 'Error'],                          // 08-27 FR3:?? → ||,default message '' 落到 String(e)='Error'
     [{ message: 'string-coerced' }, 'string-coerced'],  // 08-28 F1: duck-typed .message 分支 (typeof message === 'string' 通过)
+    [{ message: '' }, '[object Object]'],              // 08-29 R1: duck-typed 空串兜底,与 Error 分支对齐
     [{ message: null }, '[object Object]'],
     [{ message: undefined }, '[object Object]'],
     ['string-reject', 'string-reject'],

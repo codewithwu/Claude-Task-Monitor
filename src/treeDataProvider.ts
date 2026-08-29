@@ -104,13 +104,15 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeElem
     md.appendMarkdown(`**${path.basename(s.cwd) || s.cwd}** · ${statusLabel(s.status)} · ${humanizeDuration(elapsedSec)}\n\n`)
     md.appendMarkdown(`\`${s.cwd}\`\n\n`)
     if (s.lastUserPrompt) {
-      md.appendMarkdown(`Prompt: ${s.lastUserPrompt}\n\n`)
+      // appendText 而非 appendMarkdown:用户输入含未信任 markdown 字符
+      // ([](...)、![]() 等),appendMarkdown 不转义会渲染成可点链接 (08-29 R2)
+      md.appendText(`Prompt: ${s.lastUserPrompt}\n\n`)
     }
     if (s.currentTool) {
       const input = typeof s.currentTool.input === 'object'
         ? JSON.stringify(s.currentTool.input)
         : String(s.currentTool.input)
-      md.appendMarkdown(`Tool: \`${s.currentTool.name}\` ${input}\n\n`)
+      md.appendText(`Tool: ${s.currentTool.name} ${input}\n\n`)
     }
     md.appendMarkdown(`Session: \`${s.sessionId}\``)
     return md

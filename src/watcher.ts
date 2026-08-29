@@ -73,8 +73,16 @@ export class SessionsWatcher extends EventEmitter<WatcherEvents> {
     } catch {
       return
     }
-    const offset = this.offsets.get(file) ?? 0
-    if (stat.size <= offset) return
+    let offset = this.offsets.get(file) ?? 0
+    if (stat.size < offset) {
+      // 文件被截断 (truncate / 写盘失败回滚);从头重新读
+      // emit 的事件对 stateManager 是新的 —— 它没看过这些行。
+      // 同时把 offsets map 也重置,否则下一次 change 在 stat.size === offset 时
+      // 仍会早返 (08-29 R3 修复的 regression)
+      offset = 0
+      this.offsets.set(file, 0)
+    }
+    if (stat.size === offset) return
 
     const fd = fs.openSync(file, 'r')
     try {
