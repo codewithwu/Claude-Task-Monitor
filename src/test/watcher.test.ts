@@ -22,14 +22,15 @@ function wait(ms: number) {
 }
 
 describe('SessionsWatcher', () => {
-  it('新建文件触发 fileAdded', async () => {
-    const events: string[] = []
+  it('新建文件后追加行能立刻被读到 (handleAdd 不再 emit fileAdded 占位事件)', async () => {
+    const lines: any[] = []
     watcher = new SessionsWatcher(tmpDir)
-    watcher.on('fileAdded', f => events.push('add:' + path.basename(f)))
+    watcher.on('line', (_, parsed) => lines.push(parsed))
     await watcher.start()
-    fs.writeFileSync(path.join(tmpDir, 's1.jsonl'), '')
+    const file = path.join(tmpDir, 's1.jsonl')
+    fs.writeFileSync(file, JSON.stringify({ a: 1 }) + '\n')
     await wait(200)
-    expect(events).toContain('add:s1.jsonl')
+    expect(lines.map(l => l.a)).toContain(1)
   })
 
   it('追加行触发 line 事件，含完整 JSON', async () => {
@@ -87,14 +88,14 @@ describe('SessionsWatcher', () => {
   })
 
   it('忽略 .ended 目录下的文件', async () => {
-    const events: string[] = []
+    const lines: any[] = []
     watcher = new SessionsWatcher(tmpDir)
-    watcher.on('fileAdded', f => events.push(f))
+    watcher.on('line', (_, parsed) => lines.push(parsed))
     await watcher.start()
     fs.mkdirSync(path.join(tmpDir, '.ended'))
-    fs.writeFileSync(path.join(tmpDir, '.ended', 'old.jsonl'), '')
+    fs.writeFileSync(path.join(tmpDir, '.ended', 'old.jsonl'), JSON.stringify({ x: 1 }) + '\n')
     await wait(200)
-    expect(events.filter(e => e.includes('.ended'))).toHaveLength(0)
+    expect(lines.filter(e => JSON.stringify(e).includes('.ended'))).toHaveLength(0)
   })
 
   it('文件被截断后从头重新读取,不丢失新内容', async () => {

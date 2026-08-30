@@ -3,9 +3,9 @@ import * as path from 'node:path'
 import { EventEmitter } from 'node:events'
 import chokidar from 'chokidar'
 import { formatErrorMessage } from './util/formatError.js'
+import { ENDED_DIR_NAME } from './util/archiveName.js'
 
 type WatcherEvents = {
-  fileAdded: [filePath: string]
   fileRemoved: [filePath: string]
   line: [filePath: string, parsed: unknown]
   parseError: [message: string, filePath: string, line: string]
@@ -22,7 +22,7 @@ export class SessionsWatcher extends EventEmitter<WatcherEvents> {
   async start(): Promise<void> {
     fs.mkdirSync(this.dir, { recursive: true })
     this.chokidarWatcher = chokidar.watch(this.dir, {
-      ignored: (p: string) => p.includes(path.sep + '.ended'),
+      ignored: (p: string) => p.includes(path.sep + ENDED_DIR_NAME),
       persistent: true,
       ignoreInitial: false,
       depth: 1,
@@ -51,7 +51,6 @@ export class SessionsWatcher extends EventEmitter<WatcherEvents> {
   private handleAdd(file: string): void {
     if (!file.endsWith('.jsonl')) return
     if (!this.offsets.has(file)) this.offsets.set(file, 0)
-    this.emit('fileAdded', file)
     this.readNew(file)
   }
 

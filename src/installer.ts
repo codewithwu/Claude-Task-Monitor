@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { spawn } from 'node:child_process'
 
 export function writeHookScript(sourcePath: string, targetPath: string): void {
   fs.mkdirSync(path.dirname(targetPath), { recursive: true })
@@ -16,8 +17,10 @@ export function writeHookScript(sourcePath: string, targetPath: string): void {
 
 export const OWNER_TAG = 'claude-task-monitor'
 
-const HOOK_EVENTS_WITH_MATCHER = new Set(['PreToolUse', 'PostToolUse'])
-const ALL_HOOK_EVENTS = [
+// hook 事件单一来源:类型 + matcher 是否必填都从这里读。
+// ALL_HOOK_EVENTS / HOOK_EVENTS_WITH_MATCHER / HookEventName 之前三处
+// 分别维护,加新事件容易漏改一处。
+export const ALL_HOOK_EVENTS = [
   'SessionStart',
   'SessionEnd',
   'UserPromptSubmit',
@@ -26,6 +29,10 @@ const ALL_HOOK_EVENTS = [
   'Notification',
   'Stop'
 ] as const
+
+export type HookEventName = (typeof ALL_HOOK_EVENTS)[number]
+
+const HOOK_EVENTS_WITH_MATCHER = new Set<HookEventName>(['PreToolUse', 'PostToolUse'])
 
 interface HookEntry {
   matcher?: string
@@ -38,7 +45,7 @@ export interface Settings {
   [k: string]: unknown
 }
 
-function ourEntry(event: string, command: string): HookEntry {
+function ourEntry(event: HookEventName, command: string): HookEntry {
   const entry: HookEntry = {
     hooks: [{ type: 'command', command }],
     _owner: OWNER_TAG
@@ -60,8 +67,6 @@ export function mergeSettings(existing: Settings, command: string): Settings {
   }
   return result
 }
-
-import { spawn } from 'node:child_process'
 
 export function uninstallSettings(existing: Settings): Settings {
   if (!existing.hooks) return existing
@@ -91,11 +96,12 @@ export function detectJq(): Promise<boolean> {
 // 用于 onboarding 缺失分支 / treeView banner 的"复制安装命令"按钮。
 // 注意:Linux 这里只覆盖 apt 系(Debian/Ubuntu),其他发行版需用户自行替换;
 // macOS / Windows 用户按此命令装好即可。
+const JQ_INSTALL_CMDS: Partial<Record<NodeJS.Platform, string>> = {
+  darwin: 'brew install jq',
+  linux: 'sudo apt install jq',
+  win32: 'winget install jqlang.jq'
+}
+
 export function getJqInstallCommand(): string {
-  const platform = process.platform
-  if (platform === 'darwin') return 'brew install jq'
-  if (platform === 'linux') return 'sudo apt install jq'
-  if (platform === 'win32') return 'winget install jqlang.jq'
-  // fallback:用 brew 命令(Unix-like)
-  return 'brew install jq'
+  return JQ_INSTALL_CMDS[process.platform] ?? 'brew install jq'
 }

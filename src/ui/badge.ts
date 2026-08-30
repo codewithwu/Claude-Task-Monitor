@@ -9,7 +9,7 @@ import type { SessionStore } from '../stateManager.js'
 import { t } from '../i18n/index.js'
 
 export function applyBadge(treeView: vscode.TreeView<unknown>, store: SessionStore): void {
-  const waiting = store.list().filter(s => s.status === 'waiting').length
+  const waiting = store.waitingCount()
   treeView.badge = waiting > 0
     ? {
         value: waiting,

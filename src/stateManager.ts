@@ -1,4 +1,5 @@
 import type { HookPayload, ReduceResult, SessionState, SessionStatus } from './types.js'
+import { STATUS_PRIORITY, UNKNOWN_CWD, UNKNOWN_TOOL_NAME } from './types.js'
 
 const MAX_PROMPT_LEN = 60
 
@@ -26,7 +27,7 @@ function transition(prev: SessionState, next: Partial<SessionState> & { status: 
 
 export function reduce(prev: SessionState | null, event: HookPayload): ReduceResult {
   const ts = event.ts
-  const cwd = event.cwd ?? prev?.cwd ?? '<unknown>'
+  const cwd = event.cwd ?? prev?.cwd ?? UNKNOWN_CWD
   // 任何带 pid 的事件都更新 session 的 pid(不限于 SessionStart)
   // 第一次收到事件时 init 一次;有 prev 时把 event.pid 合并进去
   const base: SessionState = prev
@@ -48,7 +49,7 @@ export function reduce(prev: SessionState | null, event: HookPayload): ReduceRes
     }
 
     case 'PreToolUse': {
-      const tool = { name: event.tool_name ?? '<unknown>', input: event.tool_input ?? null }
+      const tool = { name: event.tool_name ?? UNKNOWN_TOOL_NAME, input: event.tool_input ?? null }
       return { kind: 'updated', state: transition(base, { status: 'running', currentTool: tool }, ts) }
     }
 
@@ -67,12 +68,6 @@ export function reduce(prev: SessionState | null, event: HookPayload): ReduceRes
     default:
       return { kind: 'updated', state: base }
   }
-}
-
-const STATUS_PRIORITY: Record<SessionStatus, number> = {
-  waiting: 0,
-  running: 1,
-  idle: 2
 }
 
 export class SessionStore {
@@ -113,12 +108,7 @@ export class SessionStore {
   // 用户右键 toggle 静音:同步内存视图,MutedStore 自己负责落盘。
   // 返回是否实际改了 (false = session 不存在或值已一致,no-op)
   setMuted(sessionId: string, muted: boolean): boolean {
-    const s = this.sessions.get(sessionId)
-    if (!s) return false
-    if ((s.muted === true) === muted) return false  // 已一致
-    this.sessions.set(sessionId, { ...s, muted })
-    this.emit()
-    return true
+    return this.setBooleanFlag(sessionId, 'muted', muted)
   }
 
   get(sessionId: string): SessionState | undefined {
@@ -139,12 +129,7 @@ export class SessionStore {
 
   // 切换 pinned:写入内存视图,返回是否实际改了 (false = session 不存在或值已一致)
   setPinned(sessionId: string, pinned: boolean): boolean {
-    const s = this.sessions.get(sessionId)
-    if (!s) return false
-    if ((s.pinned === true) === pinned) return false
-    this.sessions.set(sessionId, { ...s, pinned })
-    this.emit()
-    return true
+    return this.setBooleanFlag(sessionId, 'pinned', pinned)
   }
 
   // liveness 检测到进程死亡:打 dyingAt 标记,2s 延迟后由 pruneDeadSessions 真移除。
@@ -175,6 +160,22 @@ export class SessionStore {
     return undefined
   }
 
+  // 给 UI 共享的 waiting 视图:badge / status bar / syncWaitingDependentUI
+  // 共用同一份,避免每个 caller 各算各的 O(n) filter + sort。
+  waitingCount(): number {
+    let n = 0
+    for (const s of this.sessions.values()) if (s.status === 'waiting') n++
+    return n
+  }
+
+  // waiting 完整列表(供 status bar tooltip 用)。预排序,跟 list() 顺序对齐
+  // 让 sidebar / tooltip 看到的 waiting 行顺序一致。
+  listByStatus(status: SessionStatus): SessionState[] {
+    const out: SessionState[] = []
+    for (const s of this.sessions.values()) if (s.status === status) out.push(s)
+    return out.sort((a, b) => b.stateChangedAt - a.stateChangedAt)
+  }
+
   onChange(fn: () => void): void {
     this.listeners.push(fn)
   }
@@ -184,6 +185,22 @@ export class SessionStore {
   offChange(fn: () => void): void {
     const i = this.listeners.indexOf(fn)
     if (i >= 0) this.listeners.splice(i, 1)
+  }
+
+  // 复用 setMuted / setPinned 的"取反 + 判等 + emit"流水线。
+  // muted/pinned 在 schema 上 optional,所以 (undefined ?? false) === newValue
+  // 把 undefined 视作 false,语义跟原实现的 `(s.f === true) === newValue` 一致。
+  private setBooleanFlag(
+    sessionId: string,
+    field: 'muted' | 'pinned',
+    value: boolean
+  ): boolean {
+    const s = this.sessions.get(sessionId)
+    if (!s) return false
+    if ((s[field] === true) === value) return false
+    this.sessions.set(sessionId, { ...s, [field]: value })
+    this.emit()
+    return true
   }
 
   private emit(): void {

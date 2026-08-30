@@ -1,8 +1,7 @@
-import * as vscode from 'vscode'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { randomUUID } from 'node:crypto'
+import * as vscode from 'vscode'
 import { SessionsWatcher } from './watcher.js'
 import { SessionStore } from './stateManager.js'
 import { SessionTreeDataProvider } from './treeDataProvider.js'
@@ -13,8 +12,7 @@ import {
   mergeSettings,
   uninstallSettings,
   detectJq,
-  getJqInstallCommand,
-  OWNER_TAG
+  getJqInstallCommand
 } from './installer.js'
 import type { HookPayload } from './types.js'
 import type { SessionState, FilterMode } from './types.js'
@@ -28,14 +26,24 @@ import { applyBadge } from './ui/badge.js'
 import { formatSingleMessage, formatAggregateMessage } from './util/notifyMessage.js'
 import { formatErrorMessage } from './util/formatError.js'
 import { LangToggle } from './ui/langToggle.js'
+import { projectName } from './util/pathNames.js'
+import { archiveFileName, ENDED_DIR_NAME } from './util/archiveName.js'
 
 const HOME_DIR = os.homedir()
 const ROOT_DIR = path.join(HOME_DIR, '.claude-task-monitor')
 const SESSIONS_DIR = path.join(ROOT_DIR, 'sessions')
-const ENDED_DIR = path.join(SESSIONS_DIR, '.ended')
+const ENDED_DIR = path.join(SESSIONS_DIR, ENDED_DIR_NAME)
 const HOOK_SCRIPT = path.join(ROOT_DIR, 'hook.sh')
 const MUTED_FILE = path.join(ROOT_DIR, 'muted.json')
 const CLAUDE_SETTINGS = path.join(HOME_DIR, '.claude', 'settings.json')
+
+type NotifyMode = 'all' | 'aggregate' | 'silent'
+// 新配置 (notifyMode) 优先;旧 notifyAggregateMode 保留兼容:perSession→all,silent→silent。
+const AGGREGATE_FALLBACK: Record<'perSession' | 'aggregate' | 'silent', NotifyMode> = {
+  perSession: 'all',
+  aggregate: 'aggregate',
+  silent: 'silent'
+}
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const cfg = vscode.workspace.getConfiguration('claudeTaskMonitor')
@@ -45,20 +53,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const livenessMs = cfg.get<number>('livenessCheckIntervalMs', 5000)
   const aggregateMode = cfg.get<'perSession' | 'aggregate' | 'silent'>('notifyAggregateMode', 'aggregate')
 
-  // 通知模式:优先读新配置 notifyMode,fallback 到旧 notifyAggregateMode(perSession→all)。
-  // 旧配置保留是为了不破坏既有用户的设置。
-  type NotifyMode = 'all' | 'aggregate' | 'silent'
   const newMode = cfg.get<string>('notifyMode', '')
-  let notifyMode: NotifyMode
-  if (newMode === 'all' || newMode === 'aggregate' || newMode === 'silent') {
-    notifyMode = newMode
-  } else if (aggregateMode === 'perSession') {
-    notifyMode = 'all'
-  } else if (aggregateMode === 'silent') {
-    notifyMode = 'silent'
-  } else {
-    notifyMode = 'aggregate'
-  }
+  const notifyMode: NotifyMode = (newMode === 'all' || newMode === 'aggregate' || newMode === 'silent')
+    ? newMode
+    : AGGREGATE_FALLBACK[aggregateMode]
 
   // 视图过滤模式:workspaceState 持久化 (vs globalState — workspace 重置时跟着清),
   // 首次激活读 cfg.defaultFilter 作 fallback。filter 变化通过 treeDataProvider.getFilter() 闭包读取,
@@ -111,20 +109,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // silent 模式:跳过所有系统通知(但 status bar/badge 已在 notifier.notify 时同步)
     if (notifyMode === 'silent') return
 
-    if (notifyMode === 'all' || kind === 'single') {
-      // all 模式或单条:每条单独弹
-      for (const s of sessions) {
-        const msg = formatSingleMessage(s)
-        const openProjectLabel = t('notify.action.openProject')
-        void vscode.window.showWarningMessage(msg, openProjectLabel).then(action => {
-          if (action === openProjectLabel) {
-            void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(s.cwd), { forceNewWindow: false })
-          }
-        })
-      }
+    // all 模式:每条单独弹 (沿用旧体感)
+    // aggregate 模式:N≥2 弹聚合 (N=1 走单条 —— 跟旧版本结构对齐)
+    if (notifyMode === 'all') {
+      fireSingle(sessions)
       return
     }
-    // aggregate 模式 + 多 waiting:弹一条聚合,点击 reveal sidebar
+    if (sessions.length === 1) {
+      fireSingle(sessions)
+      return
+    }
     const msg = formatAggregateMessage(sessions)
     const viewSidebarLabel = t('notify.action.viewSidebar')
     void vscode.window.showWarningMessage(msg, viewSidebarLabel).then(action => {
@@ -140,9 +134,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   bootstrapExistingFiles(SESSIONS_DIR, watcher, store)
 
-  watcher.on('fileAdded', (file) => {
-    // 真正的事件回放靠 line 事件; 这里仅占位
-  })
   watcher.on('line', (file, parsedUnknown) => {
     const parsed = parsedUnknown as HookPayload
     const prevStatus = store.get(parsed.session_id)?.status
@@ -152,7 +143,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // 进 waiting → notifier 进集合 (muted=true 时 notifier 内部跳过弹通知,
     // 但 currentWaiting 仍同步,status bar/badge 反映状态)
     if (next.status === 'waiting' && prevStatus !== 'waiting') {
-      notifier.notify(next.sessionId, next.currentTool?.name ?? '<unknown>', next.cwd, next.muted === true)
+      notifier.notify(next.sessionId, next.currentTool?.name ?? '', next.cwd, next.muted === true)
     } else if (prevStatus === 'waiting' && next.status !== 'waiting') {
       // 出 waiting(Stop / PostToolUse 等)→ 静默退出集合
       notifier.exitWaiting(next.sessionId)
@@ -197,41 +188,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     void vscode.commands.executeCommand('claudeTaskMonitor.sessionsView.focus')
   })
 
-  // sidebar 右键菜单 (5 个 action,接收 SessionState 作 argument)
-  const copySessionIdCommand = vscode.commands.registerCommand('claudeTaskMonitor.copySessionId', (s: SessionState) => {
-    void vscode.env.clipboard.writeText(s.sessionId)
-  })
-  const copyAsJsonCommand = vscode.commands.registerCommand('claudeTaskMonitor.copyAsJson', (s: SessionState) => {
-    void vscode.env.clipboard.writeText(JSON.stringify(s, null, 2))
-  })
-  const openInTerminalCommand = vscode.commands.registerCommand('claudeTaskMonitor.openInTerminal', (s: SessionState) => {
-    const term = vscode.window.createTerminal({ cwd: s.cwd, name: `claude: ${path.basename(s.cwd) || s.cwd}` })
-    term.show()
-  })
-  const revealInExplorerCommand = vscode.commands.registerCommand('claudeTaskMonitor.revealInExplorer', (s: SessionState) => {
-    void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(s.cwd))
-  })
-  const archiveSessionCommand = vscode.commands.registerCommand('claudeTaskMonitor.archiveSession', (s: SessionState) => {
-    archiveSessionNow(s)
-  })
-  // 右键菜单 "Open in Current Window":forceNewWindow:false 是替换当前 workspace,
-  // 单击 / 双击已经默认走 forceNewWindow:true(在新窗口开)避免破坏上下文。
-  // 这个命令把旧默认行为降级为显式 opt-in。
-  const openInCurrentWindowCommand = vscode.commands.registerCommand('claudeTaskMonitor.openInCurrentWindow', (s: SessionState) => {
-    void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(s.cwd), { forceNewWindow: false })
-  })
-  // 右键菜单 "View Session File":revealFileInOS 到 ~/.claude-task-monitor/sessions/<id>.jsonl
-  // —— debug 时看 hook 写盘内容 / 自己排查
-  const viewSessionFileCommand = vscode.commands.registerCommand('claudeTaskMonitor.viewSessionFile', (s: SessionState) => {
-    const jsonlPath = path.join(SESSIONS_DIR, `${s.sessionId}.jsonl`)
-    void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(jsonlPath))
-  })
-  // 右键菜单 "Toggle Pin":pinned=true 时 sidebar 列表跨 group 置顶
-  const togglePinCommand = vscode.commands.registerCommand('claudeTaskMonitor.togglePin', (s: SessionState) => {
-    const next = !(s.pinned === true)
-    store.setPinned(s.sessionId, next)
-  })
-
   // 从 Command Palette 调用时的 helper:读 treeView 当前选中的 session。
   // 没选中 / 选的是 group 时返回 undefined —— caller 弹 warning。
   function getSelectedSession(): SessionState | undefined {
@@ -245,41 +201,68 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   function warnNoSelection(): void {
     void vscode.window.showWarningMessage(t('warn.noSelection'))
   }
-  // *OnSelected 版本:无 SessionState 参数,从 treeView.selection 拿。
-  // Command Palette 可搜;右键菜单仍走原命令 (有 contextValue 直接传)。
-  const copySessionIdOnSelected = vscode.commands.registerCommand('claudeTaskMonitor.copySessionIdOnSelected', () => {
-    const s = getSelectedSession()
-    if (!s) { warnNoSelection(); return }
-    void vscode.env.clipboard.writeText(s.sessionId)
+
+  // 右键 / Command Palette 共用一套命令。
+  // 右键菜单时 VS Code 把选中的 SessionState 当作 argument 传入;
+  // Command Palette 调用时无 argument → 走 getSelectedSession() 兜底。
+  // 一个命令一个行为,菜单 when 表达式按 viewItem contextValue 控制可见性。
+  const copySessionIdCommand = vscode.commands.registerCommand('claudeTaskMonitor.copySessionId', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    void vscode.env.clipboard.writeText(target.sessionId)
   })
-  const copyAsJsonOnSelected = vscode.commands.registerCommand('claudeTaskMonitor.copyAsJsonOnSelected', () => {
-    const s = getSelectedSession()
-    if (!s) { warnNoSelection(); return }
-    void vscode.env.clipboard.writeText(JSON.stringify(s, null, 2))
+  const copyAsJsonCommand = vscode.commands.registerCommand('claudeTaskMonitor.copyAsJson', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    void vscode.env.clipboard.writeText(JSON.stringify(target, null, 2))
   })
-  const openInTerminalOnSelected = vscode.commands.registerCommand('claudeTaskMonitor.openInTerminalOnSelected', () => {
-    const s = getSelectedSession()
-    if (!s) { warnNoSelection(); return }
-    const term = vscode.window.createTerminal({ cwd: s.cwd, name: `claude: ${path.basename(s.cwd) || s.cwd}` })
-    term.show()
+  const openInTerminalCommand = vscode.commands.registerCommand('claudeTaskMonitor.openInTerminal', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    openClaudeTerminal(target)
   })
-  const revealInExplorerOnSelected = vscode.commands.registerCommand('claudeTaskMonitor.revealInExplorerOnSelected', () => {
-    const s = getSelectedSession()
-    if (!s) { warnNoSelection(); return }
-    void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(s.cwd))
+  const revealInExplorerCommand = vscode.commands.registerCommand('claudeTaskMonitor.revealInExplorer', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(target.cwd))
   })
-  const archiveSessionOnSelected = vscode.commands.registerCommand('claudeTaskMonitor.archiveSessionOnSelected', () => {
-    const s = getSelectedSession()
-    if (!s) { warnNoSelection(); return }
-    archiveSessionNow(s)
+  const archiveSessionCommand = vscode.commands.registerCommand('claudeTaskMonitor.archiveSession', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    archiveSessionNow(target)
+  })
+  // 右键菜单 "Open in Current Window":forceNewWindow:false 是替换当前 workspace,
+  // 单击 / 双击已经默认走 forceNewWindow:true(在新窗口开)避免破坏上下文。
+  // 这个命令把旧默认行为降级为显式 opt-in。
+  const openInCurrentWindowCommand = vscode.commands.registerCommand('claudeTaskMonitor.openInCurrentWindow', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(target.cwd), { forceNewWindow: false })
+  })
+  // 右键菜单 "View Session File":revealFileInOS 到 ~/.claude-task-monitor/sessions/<id>.jsonl
+  // —— debug 时看 hook 写盘内容 / 自己排查
+  const viewSessionFileCommand = vscode.commands.registerCommand('claudeTaskMonitor.viewSessionFile', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    const jsonlPath = path.join(SESSIONS_DIR, `${target.sessionId}.jsonl`)
+    void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(jsonlPath))
+  })
+  // 右键菜单 "Toggle Pin":pinned=true 时 sidebar 列表跨 group 置顶
+  const togglePinCommand = vscode.commands.registerCommand('claudeTaskMonitor.togglePin', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    const next = !(target.pinned === true)
+    store.setPinned(target.sessionId, next)
   })
   // 切换单 session 通知静音:写 MutedStore (落盘) + 同步 store (UI 立即反映)。
   // 当前 muted 状态由 SessionState.muted 决定,菜单 when 表达式控制可见性。
-  const toggleMuteCommand = vscode.commands.registerCommand('claudeTaskMonitor.toggleMute', (s: SessionState) => {
-    const next = !(s.muted === true)
-    mutedStore.setMuted(s.sessionId, next)
-    store.setMuted(s.sessionId, next)
-    const name = path.basename(s.cwd) || s.cwd
+  const toggleMuteCommand = vscode.commands.registerCommand('claudeTaskMonitor.toggleMute', (s?: SessionState) => {
+    const target = s ?? getSelectedSession()
+    if (!target) { warnNoSelection(); return }
+    const next = !(target.muted === true)
+    mutedStore.setMuted(target.sessionId, next)
+    store.setMuted(target.sessionId, next)
+    const name = projectName(target.cwd)
     void vscode.window.showInformationMessage(next ? t('mute.on', name) : t('mute.off', name))
   })
   // 打开 GitHub README —— Welcome View / 错误 toast 里都能用
@@ -341,7 +324,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // PostToolUse 等不影响 waiting 集合的事件触发无意义的 UI 更新 (#7)。
   let lastWaitingCount = -1
   const syncWaitingDependentUI = () => {
-    const cur = store.list().filter(s => s.status === 'waiting').length
+    const cur = store.waitingCount()
     if (cur === lastWaitingCount) return
     lastWaitingCount = cur
     statusBar.update(store)
@@ -377,11 +360,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     togglePinCommand,
     toggleMuteCommand,
     openDocsCommand,
-    copySessionIdOnSelected,
-    copyAsJsonOnSelected,
-    openInTerminalOnSelected,
-    revealInExplorerOnSelected,
-    archiveSessionOnSelected,
     installHookCommand,
     showOnboardingCommand,
     copyJqInstallCommand,
@@ -427,6 +405,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // 首次激活 onboarding (R2)。fire-and-forget;内部自己处理 globalState 幂等
   // 「安装 hook」按钮复用 installHookAssets (跟激活时的自动安装走同一份代码)
   void maybeShowOnboarding(context, hasJq, () => Promise.resolve(installHookAssets(context)))
+}
+
+// 复用单条通知的 toast 拼接 —— notifier 回调内部 + openInCurrentWindow 旁路共用。
+function fireSingle(sessions: ReadonlyArray<{ sessionId: string; toolName: string; cwd: string }>): void {
+  const openProjectLabel = t('notify.action.openProject')
+  for (const s of sessions) {
+    const msg = formatSingleMessage(s)
+    void vscode.window.showWarningMessage(msg, openProjectLabel).then(action => {
+      if (action === openProjectLabel) {
+        void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(s.cwd), { forceNewWindow: false })
+      }
+    })
+  }
+}
+
+// 复用 terminal 创建逻辑 —— openInTerminal 命令菜单 + 后续 inline button 共用。
+function openClaudeTerminal(s: SessionState): void {
+  const term = vscode.window.createTerminal({ cwd: s.cwd, name: `claude: ${projectName(s.cwd)}` })
+  term.show()
 }
 
 // 把 hook.sh 写到 ~/.claude-task-monitor/ 并把 hooks 块合并进 ~/.claude/settings.json。
@@ -511,7 +508,7 @@ function archiveStaleFiles(sessionsDir: string, endedDir: string, staleHours: nu
     try {
       const stat = fs.statSync(full)
       if (stat.mtimeMs < cutoffMs) {
-        fs.renameSync(full, path.join(endedDir, `${path.basename(name, '.jsonl')}-${Date.now()}-${randomUUID().slice(0, 8)}.jsonl`))
+        fs.renameSync(full, path.join(endedDir, archiveFileName(path.basename(name, '.jsonl'))))
       }
     } catch {
       // 忽略
@@ -529,7 +526,7 @@ function archiveSessionNow(s: SessionState): void {
     return
   }
   try {
-    const target = path.join(ENDED_DIR, `${s.sessionId}-${Date.now()}-${randomUUID().slice(0, 8)}.jsonl`)
+    const target = path.join(ENDED_DIR, archiveFileName(s.sessionId))
     fs.renameSync(jsonlPath, target)
   } catch (e) {
     void vscode.window.showErrorMessage(`Claude Task Monitor: 归档失败:${formatErrorMessage(e)}`)

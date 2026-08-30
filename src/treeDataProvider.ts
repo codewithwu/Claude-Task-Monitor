@@ -1,15 +1,17 @@
-import * as vscode from 'vscode'
-import * as path from 'node:path'
-import type { FilterMode, SessionState, TreeElement } from './types.js'
-import { SessionGroup } from './types.js'
-import type { SessionStore } from './stateManager.js'
-import { humanizeDuration } from './util/time.js'
-import { renderRowPresentation, statusLabel } from './util/rowPresentation.js'
-import { groupByStatus, applyFilter } from './util/groupByStatus.js'
-
 // TreeView 嵌套分组:顶层 Waiting/Running/Idle group,下层 SessionState。
 // filter 由 caller 注入 (通过 getFilter 闭包),filter 变化只需 refresh(),
 // 不需要重新构造 provider —— 跟 store.onChange 走同一刷新路径。
+
+import * as vscode from 'vscode'
+import type { FilterMode, SessionState, TreeElement } from './types.js'
+import { SessionGroup } from './types.js'
+import type { SessionStore } from './stateManager.js'
+import { elapsedSince, nowSec } from './util/time.js'
+import { projectName } from './util/pathNames.js'
+import { renderRowPresentation, statusLabel } from './util/rowPresentation.js'
+import { groupByStatus, applyFilter } from './util/groupByStatus.js'
+import { humanizeDuration } from './util/time.js'
+
 export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeElement> {
   private _onDidChange = new vscode.EventEmitter<TreeElement | undefined>()
   readonly onDidChangeTreeData = this._onDidChange.event
@@ -57,16 +59,15 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeElem
     if (element instanceof SessionGroup) {
       // group 展开:同 status 的 session 列表,按 filter 二次过滤
       // (filter='all' 时等于 no-op,但走同一份 applyFilter 保持一致)
-      return applyFilter(
-        this.store.list().filter(s => s.status === element.status),
-        this.getFilter()
-      )
+      return applyFilter(this.store.listByStatus(element.status), this.getFilter())
     }
     return []
   }
 
   private getGroupItem(g: SessionGroup): vscode.TreeItem {
-    const count = this.store.list().filter(s => s.status === g.status).length
+    const count = g.status === 'waiting'
+      ? this.store.waitingCount()
+      : this.store.listByStatus(g.status).length
     const item = new vscode.TreeItem(
       `${statusLabel(g.status)} (${count})`,
       // 始终展开:group 只是逻辑分组容器,折叠反而让用户多一次点击。
@@ -78,7 +79,9 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeElem
   }
 
   private getSessionItem(s: SessionState): vscode.TreeItem {
-    const elapsedSec = Math.max(0, Math.floor(Date.now() / 1000) - s.stateChangedAt)
+    // 整个 tick 共用一个 nowSec,避免每个 row 各算各的时间漂移
+    const now = nowSec()
+    const elapsedSec = elapsedSince(s.stateChangedAt, now)
     const row = renderRowPresentation(s, elapsedSec, this.longWaitThresholdSec)
 
     const item = new vscode.TreeItem(row.label, vscode.TreeItemCollapsibleState.None)
@@ -101,7 +104,7 @@ export class SessionTreeDataProvider implements vscode.TreeDataProvider<TreeElem
 
   private buildTooltip(s: SessionState, elapsedSec: number): vscode.MarkdownString {
     const md = new vscode.MarkdownString()
-    md.appendMarkdown(`**${path.basename(s.cwd) || s.cwd}** · ${statusLabel(s.status)} · ${humanizeDuration(elapsedSec)}\n\n`)
+    md.appendMarkdown(`**${projectName(s.cwd)}** · ${statusLabel(s.status)} · ${humanizeDuration(elapsedSec)}\n\n`)
     md.appendMarkdown(`\`${s.cwd}\`\n\n`)
     if (s.lastUserPrompt) {
       // appendText 而非 appendMarkdown:用户输入含未信任 markdown 字符

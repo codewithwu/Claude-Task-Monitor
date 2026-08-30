@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { renderRowPresentation, LONG_WAITING_THRESHOLD_SEC } from '../util/rowPresentation.js'
+import { renderRowPresentation, DEFAULT_LONG_WAITING_THRESHOLD_SEC } from '../util/rowPresentation.js'
 import type { SessionState } from '../types.js'
 
 // status label 文案走 i18n,显式 mock 为 zh-cn 跟现有断言对齐。
@@ -48,7 +48,7 @@ describe('renderRowPresentation', () => {
       status: 'waiting',
       currentTool: { name: 'Bash', input: { command: 'git push --force' } }
     })
-    const row = renderRowPresentation(s, LONG_WAITING_THRESHOLD_SEC)  // 恰好 5min
+    const row = renderRowPresentation(s, DEFAULT_LONG_WAITING_THRESHOLD_SEC)  // 恰好 5min
     expect(row.iconId).toBe('alert')
     expect(row.iconColor).toBe('errorForeground')
   })
@@ -58,7 +58,7 @@ describe('renderRowPresentation', () => {
       status: 'waiting',
       currentTool: { name: 'Bash', input: { command: 'ls' } }
     })
-    const row = renderRowPresentation(s, LONG_WAITING_THRESHOLD_SEC - 1)
+    const row = renderRowPresentation(s, DEFAULT_LONG_WAITING_THRESHOLD_SEC - 1)
     expect(row.iconId).toBe('circle-filled')
     expect(row.iconColor).toBe('charts.red')
   })

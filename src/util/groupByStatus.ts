@@ -8,9 +8,8 @@
 //     让 sidebar 仍展示"我选了过滤模式",而不是看似无数据
 
 import { SessionGroup } from '../types.js'
-import type { FilterMode, SessionState, SessionStatus } from '../types.js'
-
-const STATUS_ORDER: readonly SessionStatus[] = ['waiting', 'running', 'idle'] as const
+import type { FilterMode, SessionState } from '../types.js'
+import { STATUS_ORDER } from '../types.js'
 
 export function groupByStatus(sessions: ReadonlyArray<SessionState>, filter: FilterMode): SessionGroup[] {
   if (filter === 'all') {

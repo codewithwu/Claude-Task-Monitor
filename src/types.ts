@@ -60,3 +60,22 @@ export const FILTER_MODES: readonly FilterMode[] = ['all', 'waiting', 'running',
 export function isFilterMode(s: string): s is FilterMode {
   return (FILTER_MODES as readonly string[]).includes(s)
 }
+
+// 状态排序 + 优先级 —— 整个 src/ 的 sidebar group 顺序、status bar badge 排序、
+// 通知 priority 都从这里读。改顺序只动这里,避免 groupByStatus / stateManager
+// 各维护一份 STATUS_ORDER / STATUS_PRIORITY 漂移。
+export const STATUS_ORDER: readonly SessionStatus[] = ['waiting', 'running', 'idle'] as const
+
+export const STATUS_PRIORITY: Record<SessionStatus, number> = {
+  waiting: 0,
+  running: 1,
+  idle: 2
+}
+
+// 'cwd 完全缺失时,reduce() 写入此 sentinel 保留给后续事件合并 ——
+// 让 sidebar / tooltip 有一致的 fallback 字符串,而不是每处自己写 '<unknown>'。
+export const UNKNOWN_CWD = '<unknown>'
+
+// PreToolUse 事件没带 tool_name 时的 sentinel —— rowPresentation / tooltip
+// 都按这个字符串原文渲染,统一在一处定义。
+export const UNKNOWN_TOOL_NAME = '<unknown>'

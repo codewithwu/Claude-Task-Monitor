@@ -82,8 +82,8 @@ export class Notifier {
   }
 
   private fireNotification(): void {
+    // notify() 在 fire 前必然先 set currentWaiting,所以 sessions 不可能为空。
     const sessions = Array.from(this.currentWaiting.values())
-    if (sessions.length === 0) return
     const kind: NotifyKind = sessions.length === 1 ? 'single' : 'aggregate'
     this.fn(kind, sessions)
   }

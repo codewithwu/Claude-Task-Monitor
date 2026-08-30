@@ -1,8 +1,9 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import type { SessionStore } from './stateManager.js'
+import { archiveFileName, ENDED_DIR_NAME } from './util/archiveName.js'
+import { nowSec } from './util/time.js'
 
 // 判定进程是否已不可用:
 //   1. 不存在 (ESRCH)
@@ -27,6 +28,12 @@ export function isProcessGone(pid: number): boolean {
   return checkViaWslOrTasklist(pid)
 }
 
+// /proc State 首字母 / ps stat 首字母判定进程死亡 (T/t/Z/X) ——
+// 三处检测路径都用这一份,改判定逻辑只动这里。
+function isDeadStateCode(c: string): boolean {
+  return c === 'T' || c === 't' || c === 'Z' || c === 'X'
+}
+
 // Linux/WSL guest: process.kill(pid, 0) 检测 ESRCH;成功则读 /proc 解析 State
 // /proc State 行的格式: `State:\t<T/t/Z/X/...> (<human readable>)`
 // human readable 可能是单词 (running/sleeping/stopped/zombie/dead) 也可能是多词 (tracing stop),
@@ -44,10 +51,7 @@ function checkViaProc(pid: number): boolean {
   try {
     const status = fs.readFileSync(`/proc/${pid}/status`, 'utf8')
     const m = status.match(/^State:\s+(\S)/m)
-    if (m) {
-      const c = m[1]
-      return c === 'T' || c === 't' || c === 'Z' || c === 'X'
-    }
+    if (m) return isDeadStateCode(m[1])
     return false
   } catch {
     // /proc 不可读 (容器/PID 命名空间受限) → 让调用方降级 ps
@@ -63,8 +67,7 @@ function checkViaPsFallback(pid: number): boolean {
       timeout: 1000
     }).trim()
     if (!out) return true
-    const c = out[0]
-    return c === 'T' || c === 't' || c === 'Z' || c === 'X'
+    return isDeadStateCode(out[0])
   } catch {
     return false
   }
@@ -78,10 +81,7 @@ function checkViaWslOrTasklist(pid: number): boolean {
       encoding: 'utf8',
       timeout: 1000
     }).trim()
-    if (out) {
-      const c = out[0]
-      return c === 'T' || c === 't' || c === 'Z' || c === 'X'
-    }
+    if (out && isDeadStateCode(out[0])) return true
   } catch {
     // wsl.exe 不在 PATH 或调用失败 (没有 WSL / WSL 关闭 / PID 不在 WSL 中),降级 tasklist
   }
@@ -114,9 +114,8 @@ export function pruneDeadSessions(store: SessionStore, sessionsDir: string): { r
   const archived: string[] = []
   let removed = 0
   let dying = 0
-  const nowSec = Math.floor(Date.now() / 1000)
-  const endedDir = path.join(sessionsDir, '.ended')
-  fs.mkdirSync(endedDir, { recursive: true })
+  const now = nowSec()
+  const endedDir = ensureEndedDir(sessionsDir)
 
   for (const s of store.list()) {
     if (s.pid === undefined) continue
@@ -129,7 +128,7 @@ export function pruneDeadSessions(store: SessionStore, sessionsDir: string): { r
         store.setDyingAt(s.sessionId, undefined)
         continue
       }
-      if (nowSec - s.dyingAt < DYING_DURATION_SEC) continue
+      if (now - s.dyingAt < DYING_DURATION_SEC) continue
       // 到期:归档 + 移除
       archiveAndRemove(s, sessionsDir, endedDir, archived)
       store.removeByPid(s.pid)
@@ -140,10 +139,18 @@ export function pruneDeadSessions(store: SessionStore, sessionsDir: string): { r
     if (!processGone) continue
 
     // 首次检测到死亡:标记 dying,留给后续 tick 处理
-    store.setDyingAt(s.sessionId, nowSec)
+    store.setDyingAt(s.sessionId, now)
     dying++
   }
   return { removed, archived, dying }
+}
+
+// .ended 目录在每次 prune 之前保证存在。mkdirSync recursive 本质 idempotent,
+// 但加一次 fs.existsSync 短路能让热路径在稳定状态下少做 syscall。
+function ensureEndedDir(sessionsDir: string): string {
+  const endedDir = path.join(sessionsDir, ENDED_DIR_NAME)
+  if (!fs.existsSync(endedDir)) fs.mkdirSync(endedDir, { recursive: true })
+  return endedDir
 }
 
 // dying 标记到真正移除的延迟:2s —— 用户余光能看到 sidebar 行短暂变灰再消失。
@@ -159,7 +166,7 @@ function archiveAndRemove(
   try {
     if (fs.existsSync(sessionFile)) {
       // randomUUID 切片保证同 tick 内多次归档也不撞名 (Date.now() 相同)
-      const target = path.join(endedDir, `${s.sessionId}-${Date.now()}-${randomUUID().slice(0, 8)}.jsonl`)
+      const target = path.join(endedDir, archiveFileName(s.sessionId))
       fs.renameSync(sessionFile, target)
       archived.push(target)
     }

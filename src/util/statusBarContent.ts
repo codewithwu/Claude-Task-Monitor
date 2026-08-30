@@ -3,10 +3,10 @@
 //
 // 文案走 i18n:用户 locale 自动决定中英文。
 
-import * as path from 'node:path'
-import { humanizeDuration } from './time.js'
+import { humanizeDuration, nowSec, elapsedSince } from './time.js'
+import { projectName } from './pathNames.js'
 import { t } from '../i18n/index.js'
-import type { SessionState } from '../types.js'
+import type { SessionState, SessionStatus } from '../types.js'
 
 export interface StatusBarContent {
   text: string
@@ -15,9 +15,10 @@ export interface StatusBarContent {
 
 const TOP_WAITING_IN_TOOLTIP = 3
 
-export function computeStatusBarContent(sessions: ReadonlyArray<{ status: string }>): StatusBarContent {
+export function computeStatusBarContent(sessions: ReadonlyArray<{ status: SessionStatus }>): StatusBarContent {
   const total = sessions.length
-  const waiting = sessions.filter(s => s.status === 'waiting').length
+  let waiting = 0
+  for (const s of sessions) if (s.status === 'waiting') waiting++
 
   if (waiting === 0) {
     return {
@@ -36,15 +37,13 @@ export function computeStatusBarContent(sessions: ReadonlyArray<{ status: string
 // 输入是完整 SessionState[](需要 cwd + stateChangedAt),由 StatusBar 调用。
 export function formatWaitingTooltip(
   waitingSessions: ReadonlyArray<SessionState>,
-  nowSec: number = Math.floor(Date.now() / 1000),
+  nowSecValue: number = nowSec(),
   topN: number = TOP_WAITING_IN_TOOLTIP
 ): string {
   if (waitingSessions.length === 0) return ''
-  const items = waitingSessions.slice(0, topN).map(s => {
-    const elapsed = Math.max(0, nowSec - s.stateChangedAt)
-    const name = path.basename(s.cwd) || s.cwd
-    return `${name} ${humanizeDuration(elapsed)}`
-  })
+  const items = waitingSessions.slice(0, topN).map(s =>
+    `${projectName(s.cwd)} ${humanizeDuration(elapsedSince(s.stateChangedAt, nowSecValue))}`
+  )
   const n = waitingSessions.length
   const itemsStr = items.join(', ')
   if (n <= topN) {

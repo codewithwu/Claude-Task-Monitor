@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import * as vscode from 'vscode'
 import { applyBadge } from '../ui/badge.js'
-import type { SessionState } from '../types.js'
+import type { SessionState, SessionStatus } from '../types.js'
 import type { SessionStore } from '../stateManager.js'
 
 // applyBadge 是纯副作用函数(treeView.badge = ...)：
@@ -14,7 +14,12 @@ function makeFakeTreeView() {
 }
 
 function makeStore(sessions: SessionState[]): SessionStore {
-  return { list: () => sessions } as unknown as SessionStore
+  const waiting = sessions.filter(s => s.status === 'waiting').length
+  return {
+    list: () => sessions,
+    waitingCount: () => waiting,
+    listByStatus: (status: SessionStatus) => sessions.filter(s => s.status === status)
+  } as unknown as SessionStore
 }
 
 function s(status: 'idle' | 'running' | 'waiting', id = 's'): SessionState {

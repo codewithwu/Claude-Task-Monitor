@@ -33,10 +33,10 @@ export class StatusBar {
     const sessions = store.list()
     const content = computeStatusBarContent(sessions)
     this.item.text = content.text
-    // 有 waiting 时 tooltip 升级为 top-3 项目列表,让用户不展开 sidebar 也能定位
-    const waiting = sessions.filter(s => s.status === 'waiting')
-    const tooltip = waiting.length > 0
-      ? formatWaitingTooltip(waiting)
+    // waiting 列表 + tooltip 一次性算出,共享 waitingCount / listByStatus 的视图
+    const waitingCount = store.waitingCount()
+    const tooltip = waitingCount > 0
+      ? formatWaitingTooltip(store.listByStatus('waiting'))
       : content.tooltip
     this.item.tooltip = tooltip
   }
