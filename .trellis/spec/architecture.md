@@ -113,3 +113,17 @@ There is intentionally no:
 - Web frontend. The tree view is the UI; status colours come from `ThemeIcon` + `ThemeColor`.
 
 If a change needs any of these, it needs a discussion, not just a patch.
+
+#### Cross-window coordination via lock file (08-31)
+
+The extension host runs once per VS Code window; `Notifier` is process-local, so without coordination the same `waiting` event triggers N toasts for N windows. We elect a single toast emitter per host via a file lock at `~/.claude-task-monitor/notify-leader.lock`.
+
+Properties:
+
+- File-based; no IPC, no network, no port.
+- Per-host isolation (`os.hostname()`) — shared `$HOME` across machines (NFS) does NOT suppress notifications on the other host.
+- Fail-open: any fs error → `isLeader()` returns true → fall back to "all windows notify" (the pre-feature behavior). Missing a notification is worse than duplicating one.
+- Implementation: `src/util/leaderLock.ts`. Gated by `claudeTaskMonitor.notifyLeaderElection`.
+- Focus-driven election: the most-recently-focused window holds the lock. Blur stops heartbeats; the lock expires after `STALE_AFTER_MS = 6000` (3× heartbeat) so the next focused window takes over.
+
+This is **not** general cross-process state — it's a single-purpose coordination signal. The `_owner`-tagged settings.json and `muted.json` patterns are unchanged.

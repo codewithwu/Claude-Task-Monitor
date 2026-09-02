@@ -131,6 +131,12 @@ The actual `showWarningMessage` callback is constructed inline in `extension.ts:
 - **Don't put `vscode.window.showWarningMessage` calls inside `Notifier`.** It would force the unit tests to mock VS Code; the current split (Notifier = pure dedup, callback = VS Code surface) lets `notifier.test.ts` run without VS Code at all.
 - **Don't widen the dedup window beyond `notifyDedupeSeconds`** thinking "more is better". A long window means missing genuine re-prompts; the default 30s is already generous.
 
+#### Leader election gating (08-31)
+
+`Notifier` 回调首行检查 `leaderLock.isLeader()`；非 leader 窗口的 toast 路径直接 return。sidebar / status bar / badge 不受影响（走 `store.onChange`，与 toast 路径正交）。`src/extension.ts:122` 的回调结构保持不变，只是首行多一道闸门。详细协议见 `architecture.md#cross-window-coordination-via-lock-file-08-31` 和 `src/util/leaderLock.ts` 头注。
+
+Gated by `claudeTaskMonitor.notifyLeaderElection`（默认 `true`）。关闭时闸门恒为 true，回退到「每窗口各弹一条」旧行为。
+
 ---
 
 ## Configuration — adding a new setting
