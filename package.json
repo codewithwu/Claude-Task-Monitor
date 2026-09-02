@@ -248,6 +248,11 @@
           "enum": ["auto", "zh", "en"],
           "default": "auto",
           "description": "UI 语言:auto 跟随 VS Code display language;zh/en 强制覆盖扩展内的动态文案 (status bar / sidebar / toast / notification)。Command Palette 与视图标题仍由 VS Code display language 决定,改本设置不会切换它们。"
+        },
+        "claudeTaskMonitor.notifyLeaderElection": {
+          "type": "boolean",
+          "default": true,
+          "description": "跨窗口通知去重 (leader election)。多开 VS Code 窗口时,同一 waiting 事件只由最近聚焦的窗口弹通知;其他窗口的 sidebar / status bar / badge 仍各自更新。关闭则回到旧行为:每个窗口各弹一条。"
         }
       }
     }

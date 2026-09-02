@@ -20,6 +20,7 @@ import { FILTER_MODES, isFilterMode } from './types.js'
 import { StatusBar, FOCUS_SESSIONS_VIEW_COMMAND } from './ui/statusBar.js'
 import { maybeShowOnboarding, showOnboardingCards } from './ui/onboarding.js'
 import { MutedStore } from './util/muted.js'
+import { LeaderLock } from './util/leaderLock.js'
 import { LangStore, type LangPref } from './util/langStore.js'
 import { t, setLangOverride } from './i18n/index.js'
 import { applyBadge } from './ui/badge.js'
@@ -35,6 +36,7 @@ const SESSIONS_DIR = path.join(ROOT_DIR, 'sessions')
 const ENDED_DIR = path.join(SESSIONS_DIR, ENDED_DIR_NAME)
 const HOOK_SCRIPT = path.join(ROOT_DIR, 'hook.sh')
 const MUTED_FILE = path.join(ROOT_DIR, 'muted.json')
+const NOTIFY_LOCK_FILE = path.join(ROOT_DIR, 'notify-leader.lock')
 const CLAUDE_SETTINGS = path.join(HOME_DIR, '.claude', 'settings.json')
 
 type NotifyMode = 'all' | 'aggregate' | 'silent'
@@ -83,6 +85,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const effective = langStore.get()
   setLangOverride(effective === 'auto' ? undefined : effective)
 
+  // 跨窗口通知去重的 leader-election (08-31 cross-window-notify-dedupe):
+  // 关闭时 leaderLock.isLeader() 永远返回 true,行为退化为旧版"每窗口各弹一条"。
+  const notifyLeaderElection = cfg.get<boolean>('notifyLeaderElection', true)
+  const leaderLock = new LeaderLock({ lockPath: NOTIFY_LOCK_FILE })
+  if (!notifyLeaderElection) leaderLock.disable()
+
   fs.mkdirSync(SESSIONS_DIR, { recursive: true })
   fs.mkdirSync(ENDED_DIR, { recursive: true })
 
@@ -108,6 +116,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const notifier = new Notifier(dedupeSeconds, (kind, sessions) => {
     // silent 模式:跳过所有系统通知(但 status bar/badge 已在 notifier.notify 时同步)
     if (notifyMode === 'silent') return
+
+    // 跨窗口 leader-election 闸门 (08-31):非 leader 窗口不发 toast。
+    // sidebar / status bar / badge 不受影响 —— 它们走 store.onChange 路径。
+    if (notifyLeaderElection && !leaderLock.isLeader()) return
 
     // all 模式:每条单独弹 (沿用旧体感)
     // aggregate 模式:N≥2 弹聚合 (N=1 走单条 —— 跟旧版本结构对齐)
@@ -182,6 +194,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // 文本/tooltip 由 LangToggle 内部读 LangStore 计算。构造参数收窄为 getter
   // (render() 只读 pref),跟 LangStore 写方法解耦。
   const langToggle = new LangToggle(() => langStore.get())
+
+  // Leader-election (08-31 cross-window-notify-dedupe):
+  // 启动心跳 + 监听窗口聚焦变化。聚焦时抢锁 + 启心跳;失焦时让心跳自然停,
+  // 锁文件 STALE_AFTER_MS 后过期,其他窗口接管。NotifyFn 回调首行的
+  // leaderLock.isLeader() 检查是真正的闸门。
+  leaderLock.start()
+  if (vscode.window.state?.focused) {
+    leaderLock.setActive(true)
+    leaderLock.tryAcquireNow()
+  }
+  const windowStateSub = vscode.window.onDidChangeWindowState(state => {
+    if (state.focused) {
+      leaderLock.setActive(true)
+      leaderLock.tryAcquireNow()
+    } else {
+      leaderLock.setActive(false)
+    }
+  })
 
   // 注册 reveal sidebar 命令 (status bar / 通知点击都触发)
   const focusCommand = vscode.commands.registerCommand(FOCUS_SESSIONS_VIEW_COMMAND, () => {
@@ -366,6 +396,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     setFilterCommand,
     toggleLanguageCommand,
     langToggle,
+    windowStateSub,
+    { dispose: () => leaderLock.stop() },
     // cfg 热更新:用户改 longWaitingThresholdSec 后立即生效,无需 reload window。
     // 监听器返回的 Disposable 直接 push 进 subscriptions,dispose 时自动解绑。
     vscode.workspace.onDidChangeConfiguration(e => {
@@ -394,6 +426,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         applyJqBanner(treeView, hasJq)
         provider.refresh()
         langToggle.render()
+      }
+      // 跨窗口通知 leader-election 开关热更新 (08-31):开则恢复选举,
+      // 关则立刻让本窗口视作 leader (旧行为) —— 无需 reload window。
+      if (e.affectsConfiguration('claudeTaskMonitor.notifyLeaderElection')) {
+        const on = vscode.workspace.getConfiguration('claudeTaskMonitor')
+          .get<boolean>('notifyLeaderElection', true)
+        if (on) {
+          leaderLock.enable()
+          if (vscode.window.state?.focused) leaderLock.tryAcquireNow()
+        } else {
+          leaderLock.disable()
+        }
       }
     }),
     statusBar,

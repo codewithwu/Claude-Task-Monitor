@@ -7,6 +7,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- **跨窗口通知去重 (leader election)**（`08-31-cross-window-notify-dedupe`）:
+  开 N 个 VS Code 窗口时,同一 waiting 事件只弹 1 条 toast —— 取代原来每个窗口各弹一条的体验。
+  基于 `~/.claude-task-monitor/notify-leader.lock` 的焦点感知选举:持锁者 = 最近聚焦的窗口,
+  心跳过期或主动释放后接管。任何 fs 异常走 fail-open,绝不让所有窗口同时静默。
+  配置 `claudeTaskMonitor.notifyLeaderElection` 控制开关（默认 `true`）。
+  新增 `src/util/leaderLock.ts`（纯 fs,无 vscode import）+ `src/test/leaderLock.test.ts`
+  （20 例,含真实 child process 多进程竞争「恰好 1 胜出」）。
+
 ## [0.3.5] - 2026-08-29
 
 ### Fixed
