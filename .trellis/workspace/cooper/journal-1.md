@@ -217,3 +217,25 @@ Closed 7 follow-up findings from /code-review @src/ on 2026-08-26 against the 08
 - git push origin main (1 commit ahead of origin: 4f86ab6)
 - Future backlog (out of scope here): extension.ts:deactivate() '是'/'否' buttons + 5 other Chinese toasts (lines 82/89/159/461/468) — see .trellis/spec/i18n.md 'Out of scope' section
 - Future backlog: investigate the 4 pre-existing tsc errors on main (extension.ts:241/242/312/461 — SessionGroup undefined / TreeElement not assignable / FilterMode | undefined / MarkdownString not assignable) — not introduced by this task but should be tracked separately
+
+
+## Session 5: 跨窗口通知去重 (leader election)
+
+**Date**: 2026-09-02
+**Task**: 跨窗口通知去重 (leader election)
+**Branch**: `main`
+
+### Summary
+
+多开 VS Code 窗口时同一 waiting 事件只弹 1 条 toast。新增 src/util/leaderLock.ts (纯 fs,零 vscode import, fail-open, per-host 隔离) + src/test/leaderLock.test.ts (20 例,含真实 child process 多进程)。Notifier 类型签名零改动 (F3)。CHANGELOG [Unreleased] 加 Added 段。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cdb72cb` | (see git log) |
+| `e362bfa` | (see git log) |
+
+### Status
+
+[OK] **Completed**

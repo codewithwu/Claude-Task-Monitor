@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
-- **Last Active**: 2026-08-26
+- **Total Sessions**: 5
+- **Last Active**: 2026-09-02
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~219 | Active |
+| `journal-1.md` | ~241 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-09-02 | 跨窗口通知去重 (leader election) | `cdb72cb`, `e362bfa` | `main` |
 | 4 | 2026-08-26 | Address 7 code-review findings on i18n/lang pipeline (round 2) | `4f86ab6` | `main` |
 | 3 | 2026-08-23 | Fix v0.2.0 refactor leftovers (i18n + 3 bugs) | `68e3991`, `6055292`, `8580479` | `main` |
 | 2 | 2026-08-16 | 0.1.5 → 0.1.9: UX 三件套 + /code-review 修复 + 右键菜单 + Open VSX 发布 | `4580916` | `main` |
