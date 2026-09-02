@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/architecture.md", "reason": "§Boundaries That Are Not There 要求新增跨进程协调需登记;补记 leaderLock 的位置 / fail-open / per-host 隔离"}
+{"file": ".trellis/spec/lifecycle.md", "reason": "notifier 段落补 leader election gating 子节;声明 Notifier 类型签名与回调结构不变"}
+{"file": ".trellis/spec/testing.md", "reason": "real-child-process 测试约定、cleanup、timeout 要求 —— leaderLock 多进程竞争测试照此实现"}
+{"file": ".trellis/spec/index.md", "reason": "失败代价不对称原则（false positives worse than false negatives）支撑 R6 fail-open 设计"}
+{"file": "notes/improvement-backlog.md", "reason": "原始 #3 条目源;本任务对应 backlog 行确认范围一致"}

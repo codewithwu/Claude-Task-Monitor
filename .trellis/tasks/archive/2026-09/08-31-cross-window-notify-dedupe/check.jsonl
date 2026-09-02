@@ -1,0 +1,9 @@
+{"file": "src/notifier.ts", "reason": "F3 关键约束:Notifier 类型签名与 dedupe 语义不变,只动 extension.ts 回调首行;检查任何对 Notifier 的意外修改"}
+{"file": "src/extension.ts", "reason": "回调 L108-129 首行加 leaderLock.isLeader() 闸门 + L60 读 cfg + L184 监听 windowState + L349 注销 + L371 热更新;检查 5 处改动无遗漏、无错位"}
+{"file": "src/util/leaderLock.ts", "reason": "新增文件;检查 fail-open 覆盖所有 fs 异常路径、release 仅删自己的锁、不引入 VS Code 依赖"}
+{"file": "src/util/muted.ts", "reason": "既有跨进程文件状态先例;leaderLock 复用同目录约定,不应破坏 muted.json 的读写"}
+{"file": "package.json", "reason": "contributes.configuration.properties 加 notifyLeaderElection;description 中文直写沿用既有风格,无 package.nls.json key"}
+{"file": ".trellis/spec/architecture.md", "reason": "AC7 要求补记;grep \"leaderLock\\|notify-leader\" 应能命中"}
+{"file": ".trellis/spec/lifecycle.md", "reason": "AC7 要求补记;notifier 段落应有 leader election gating 子节"}
+{"file": "src/test/leaderLock.test.ts", "reason": "AC6 要求;检查真实 child process 测试 + tmpdir 清理 + chmod-000 平台分支 + 多进程恰好 1 胜出断言"}
+{"file": "src/test/notifier.test.ts", "reason": "F3 守住不变量:Notifier 测试不应 mock VS Code、不应感知 leaderLock;若测试失败说明闸门被错误塞进 Notifier"}

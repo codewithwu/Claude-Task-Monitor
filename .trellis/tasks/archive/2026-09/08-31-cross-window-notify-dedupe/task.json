@@ -1,0 +1,28 @@
+{
+  "id": "cross-window-notify-dedupe",
+  "name": "cross-window-notify-dedupe",
+  "title": "跨窗口通知去重 (leader election)",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "cooper",
+  "assignee": "cooper",
+  "createdAt": "2026-08-31",
+  "completedAt": "2026-09-02",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "priority": "P0"
+  }
+}
