@@ -2,7 +2,7 @@
   "name": "claude-task-monitor",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "publisher": "codewithwu-cn",
   "license": "MIT",
   "icon": "resources/icons/icon.png",

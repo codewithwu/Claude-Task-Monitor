@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-09-02
+
 ### Added
 
 - **跨窗口通知去重 (leader election)**（`08-31-cross-window-notify-dedupe`）:
