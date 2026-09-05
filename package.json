@@ -265,7 +265,8 @@
     "build:integration": "tsc -p tsconfig.integration.json",
     "test:integration": "pnpm build && pnpm build:integration && node ./dist-test/runTest.js",
     "package": "vsce package --no-dependencies && mkdir -p packages && mv *.vsix packages/",
-    "vscode:prepublish": "pnpm build"
+    "vscode:prepublish": "pnpm build",
+    "vscode:uninstall": "node ./dist/uninstall.js"
   },
   "dependencies": {
     "chokidar": "^3.6.0"

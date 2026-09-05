@@ -99,7 +99,7 @@ These must stay true or the dashboard lies:
 - Every status transition goes through `reduce()`. Components never mutate `SessionState` directly. (See `state.md`.)
 - The on-disk JSONL and the store are **not** kept in sync by re-reading the file. The watcher appends lines; the store applies them. If they drift, the drift is hidden — see `state.md#bootstrap`.
 - `pid` is captured by `hook.sh`, not by the extension. The extension only consumes it. If a future change lets the extension set the PID, it has to re-derive from `/proc` the same way `hook.sh` does — see `liveness.md`.
-- The `_owner` tag is the installer's only safety net. Without it, `deactivate()` would delete unrelated hooks. See `lifecycle.md`.
+- The `_owner` tag is the installer's only safety net. Without it, `uninstallSettings` (called from `src/uninstall.ts` on actual uninstall) would delete unrelated hooks. See `lifecycle.md#uninstall-flow-vscodeuninstall--09-05`.
 
 ---
 

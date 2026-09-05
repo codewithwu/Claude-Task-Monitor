@@ -31,18 +31,37 @@ Step 6 (`archiveStaleFiles`, `src/extension.ts:143-158`) moves `.jsonl` files ol
 
 ---
 
-## `deactivate()` — `src/extension.ts:125`
+## `deactivate()` — `src/extension.ts:521`
 
-Asks the user "卸载：是否同时移除已注入的 hooks 与 hook.sh?". On "是":
+Empty body. Resource release (watcher / leaderLock / context subscriptions) is handled automatically by VS Code disposing the registered subscriptions. The uninstall cleanup that used to live here has moved to `package.json scripts.vscode:uninstall → dist/uninstall.js` (see [Uninstall flow (09-05)](#uninstall-flow-vscodeuninstall--09-05)).
 
-1. Read `~/.claude/settings.json`, run `uninstallSettings(existing)`, write it back. Strips entries whose `_owner === OWNER_TAG`. If `hooks` ends up empty, the `hooks` key itself is deleted.
-2. `fs.unlinkSync(HOOK_SCRIPT)` if it exists.
+### Why no dialog?
 
-Any error during deactivate is `console.warn`'d and swallowed — VS Code is shutting down, there's no user to inform.
+`deactivate()` fires on **every** path that closes the extension host — Reload Window, closing the last VS Code window, disabling the extension, **and** uninstalling. Asking the user "卸载：是否同时移除已注入的 hooks 与 hook.sh?" on reload is pure noise with a real risk of misclicks. VS Code has no runtime API that fires *only* on uninstall, so the cleanup has to run via a different surface: the `vscode:uninstall` lifecycle script.
 
-### Why the prompt?
+## Uninstall flow (`vscode:uninstall`, 09-05)
 
-The prompt exists because uninstalling deletes `~/.claude/settings.json` keys tagged with our `OWNER_TAG`. If the user disables the extension to debug something else, they probably want to keep the hooks so they don't have to reinstall. If they're truly done, they say yes. Don't remove the prompt without an alternative way to recover the previous settings.
+`package.json scripts.vscode:uninstall` is `"node ./dist/uninstall.js"`. VS Code calls it on the next launch after the user uninstalls the extension. The script:
+
+1. Reads `~/.claude/settings.json`. If missing → done. If present and unchanged → no-op write (matches `installHookAssets` #9).
+2. Runs `uninstallSettings(existing)` — strips every entry whose `_owner === OWNER_TAG`. If `hooks` becomes empty, the `hooks` key itself is deleted.
+3. `fs.unlinkSync(~/.claude-task-monitor/hook.sh)` if it exists.
+4. Any error → `console.warn` and exit 0. The uninstall already happened; noisy failures don't help the user.
+
+`src/uninstall.ts` exports `runUninstall({ home })` as a pure function (home is injected for tests) and a thin `require.main === module` CLI wrapper. The function lives in its own tsup entry (`tsup.config.ts`) so it ships as `dist/uninstall.js` next to `dist/extension.js` — no `vscode` import, no Extension Host dependency.
+
+### Why not keep the dialog?
+
+The dialog had two failure modes:
+
+1. **Reload Window / close window / disable extension** — none of these intend to uninstall, but the dialog still appears. Users click through reflexively and either keep hooks they no longer want or delete hooks they didn't intend to.
+2. **Actual uninstall** — `deactivate()` is called *before* VS Code finishes uninstalling. The `void .then(...)` cleanup is racy and often dropped. The user reports "I uninstalled but my hooks are still there".
+
+The `vscode:uninstall` hook (VS Code 1.21+, Feb 2018) is the official answer to both. Our `engines.vscode: ^1.86.0` covers it.
+
+### Migration of the old i18n keys
+
+`extension.uninstall.prompt` / `.remove` / `.keep` in `src/i18n/messages/{en,zh}.ts` are kept but unused after 09-05. Reserved for future use (e.g. a settings-page action). Removing them would break any user-pinned translation cache and gain nothing.
 
 ---
 
@@ -169,7 +188,8 @@ To add `claudeTaskMonitor.foo` with default `42`:
 | File | Role |
 |------|------|
 | `src/extension.ts` | `activate`/`deactivate`, config wiring, archive-on-startup, bootstrap |
-| `src/installer.ts` | `writeHookScript`, `mergeSettings`, `uninstallSettings`, `detectJq`, `OWNER_TAG` |
+| `src/installer.ts` | `writeHookScript`, `mergeSettings`, `uninstallSettings`, `detectJq`, `OWNER_TAG`, `HOOK_SCRIPT_REL`, `CLAUDE_SETTINGS_REL` |
+| `src/uninstall.ts` | `runUninstall({ home })` + CLI entry — `dist/uninstall.js`, run by `vscode:uninstall` |
 | `src/treeDataProvider.ts` | TreeDataProvider adapter (icon, tooltip, refresh) |
 | `src/notifier.ts` | `Notifier.notify` with dedup map |
-| `package.json` | settings, view registration, `activationEvents: ["onStartupFinished"]` |
+| `package.json` | settings, view registration, `activationEvents: ["onStartupFinished"]`, `scripts.vscode:uninstall` |

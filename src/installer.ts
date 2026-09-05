@@ -17,6 +17,12 @@ export function writeHookScript(sourcePath: string, targetPath: string): void {
 
 export const OWNER_TAG = 'claude-task-monitor'
 
+// 相对 home 的路径常量 —— src/uninstall.ts (vscode:uninstall 入口)复用,
+// 避免卸载脚本里再写一遍硬编码。extension.ts 里旧的 HOOK_SCRIPT /
+// CLAUDE_SETTINGS 常量保留(可读性 + 现有 import 路径不动)。
+export const HOOK_SCRIPT_REL = '.claude-task-monitor/hook.sh'
+export const CLAUDE_SETTINGS_REL = '.claude/settings.json'
+
 // hook 事件单一来源:类型 + matcher 是否必填都从这里读。
 // ALL_HOOK_EVENTS / HOOK_EVENTS_WITH_MATCHER / HookEventName 之前三处
 // 分别维护,加新事件容易漏改一处。

@@ -10,7 +10,6 @@ import { pruneDeadSessions } from './liveness.js'
 import {
   writeHookScript,
   mergeSettings,
-  uninstallSettings,
   detectJq,
   getJqInstallCommand
 } from './installer.js'
@@ -519,28 +518,12 @@ async function pickFilterMode(): Promise<FilterMode | undefined> {
 }
 
 export function deactivate(): void {
-  // 不 await:VS Code 卸载时扩展宿主可能被强制关闭,未 resolve 的 Promise
-  // 会被丢弃,导致 hook 清理静默跳过。fire-and-forget + best-effort fs cleanup
-  // 是文档推荐的模式 (08-29 R4)。
-  const removeLabel = t('extension.uninstall.remove')
-  const keepLabel = t('extension.uninstall.keep')
-  void vscode.window.showInformationMessage(
-    t('extension.uninstall.prompt'),
-    removeLabel,
-    keepLabel
-  ).then((choice) => {
-    if (choice !== removeLabel) return
-    try {
-      if (fs.existsSync(CLAUDE_SETTINGS)) {
-        const existing = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8'))
-        const cleaned = uninstallSettings(existing)
-        fs.writeFileSync(CLAUDE_SETTINGS, JSON.stringify(cleaned, null, 2))
-      }
-      if (fs.existsSync(HOOK_SCRIPT)) fs.unlinkSync(HOOK_SCRIPT)
-    } catch (e) {
-      console.warn('[claude-task-monitor] uninstall failed:', formatErrorMessage(e))
-    }
-  })
+  // 仅做 best-effort 资源释放。
+  // 09-05 P0 #2:卸载清理已迁移到 package.json scripts.vscode:uninstall →
+  // dist/uninstall.js(由 src/uninstall.ts 编译)。deactivate() 在 reload /
+  // 关闭窗口 / 禁用扩展时也会触发,放在这里会让日常用户误触对话框。
+  // 资源释放(context.subscriptions / leaderLock / watcher)由 activate
+  // 注册的 disposable 在 VS Code 关闭扩展宿主时自动接管,这里无需重复。
 }
 
 function archiveStaleFiles(sessionsDir: string, endedDir: string, staleHours: number): void {
