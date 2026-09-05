@@ -7,6 +7,32 @@
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-09-05
+
+### Added
+
+- **Uninstall 钩子与 `deactivate()` 解耦**（commit `fcc4b1f`，task `09-05-deactivate-uninstall-dialog`）:
+  `deactivate()` 会在 reload / 窗口关闭 / 扩展禁用 / 卸载时全部触发,把"移除 hook?"对话框塞到这些路径上既吵又容易误点,而且真正卸载时 `void .then()` 还经常被 VS Code 提前截断。新增 `src/uninstall.ts`（纯 fs、无 vscode import）,
+  `package.json` 增加 `vscode:uninstall` 生命周期钩子指向 `node ./dist/uninstall.js`,
+  `deactivate()` 只剩资源释放。`installer.ts` 导出 `HOOK_SCRIPT_REL` /
+  `CLAUDE_SETTINGS_REL` 让 uninstall 复用唯一真源;tsup 新增 `uninstall` 入口
+  （3.5KB）。新增 6 个单元测试覆盖混合 hook 状态、缺失文件、幂等回写、hook.sh
+  删除、完整 7 事件清理、损坏 JSON 兜底。closes improvement-backlog #2 (P0)。
+
+### Fixed
+
+- **macOS 上 PID 捕获失败导致 session 消失**（commit `009be26`，task `09-05-macos-session-disappear`）:
+  `resources/hook.sh` 的 PID 上溯循环只走 `/proc/<pid>/comm`,macOS 没有
+  /proc,`cat` 直接失败,`claude_pid` 留空。`effective_pid` 回落到 transient
+  `PPID`(每个 hook event 都新生的 node MainThread / sh 子壳),5 秒后
+  `pruneDeadSessions` 判定它已死,session 在每次事件后 ~2 秒就从侧边栏消失。
+  抽出 `get_comm()` / `get_ppid()`,Linux 保留零 fork 的 `/proc` 直读,
+  macOS 走 POSIX `ps -o comm=,ppid= ` + `tr -d ' '` 去掉 macOS ps 的尾部
+  空白。while 循环体不动,只把查表原语变成平台感知。新增 3 个单元测试
+  （bash -n 语法校验、Linux source-out 烟雾测试、静态断言 Darwin 分支存在）。
+  `spec/liveness.md` 新增"PID capture lives in hook.sh, not here"段落防止
+  后续 liveness 改动漂到错文件。closes improvement-backlog #1 (P0)。
+
 ## [0.3.6] - 2026-09-02
 
 ### Added
