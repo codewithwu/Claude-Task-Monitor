@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
-- **Last Active**: 2026-09-02
+- **Total Sessions**: 6
+- **Last Active**: 2026-09-06
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~241 | Active |
+| `journal-1.md` | ~263 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-09-06 | 实现 #4:跳转到跑 Claude 的那个终端而非新开 | `e06da35`, `6569479` | `main` |
 | 5 | 2026-09-02 | 跨窗口通知去重 (leader election) | `cdb72cb`, `e362bfa` | `main` |
 | 4 | 2026-08-26 | Address 7 code-review findings on i18n/lang pipeline (round 2) | `4f86ab6` | `main` |
 | 3 | 2026-08-23 | Fix v0.2.0 refactor leftovers (i18n + 3 bugs) | `68e3991`, `6055292`, `8580479` | `main` |

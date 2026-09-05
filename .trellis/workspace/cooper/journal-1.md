@@ -239,3 +239,25 @@ Closed 7 follow-up findings from /code-review @src/ on 2026-08-26 against the 08
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: 实现 #4:跳转到跑 Claude 的那个终端而非新开
+
+**Date**: 2026-09-06
+**Task**: 实现 #4:跳转到跑 Claude 的那个终端而非新开
+**Branch**: `main`
+
+### Summary
+
+P1 功能 #4:sidebar「在终端中打开」默认聚焦跑 claude 的集成终端 tab,命中失败 fallback 开新 + toast。新增 src/util/pidAncestor.ts + src/util/findClaudeTerminal.ts(跨平台 walkUpToComm + cwd 评分),改写 src/extension.ts:467 openClaudeTerminal,i18n 加 toast.terminal.notFound。pnpm build ✅,pnpm vitest run 315/315 全绿(新测 26 个)。spec 在 .trellis/spec/liveness.md 加一节记录三份 PID 模块按职责不复用的设计选择。README「已知局限」第二条精确化(本窗口集成终端路径已解决,仅外部/跨窗口受限于 VS Code API)。2 个 commit:e06da35 feat + 6569479 docs。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e06da35` | (see git log) |
+| `6569479` | (see git log) |
+
+### Status
+
+[OK] **Completed**
