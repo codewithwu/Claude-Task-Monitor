@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/liveness.md", "reason": "Existing platform-routing reference for PID walking (Linux /proc, macOS ps, Windows wsl). Reuse the contract, do NOT reuse the function."}
+{"file": ".trellis/spec/testing.md", "reason": "Test conventions for src/test/* — vitest with real child procs; cleanup leftover session files (already a memory)."}
+{"file": ".trellis/spec/i18n.md", "reason": "i18n key conventions for adding toast.terminal.notFound in zh.ts and en.ts."}
+{"file": ".trellis/tasks/09-06-jump-to-that-terminal/design.md", "reason": "Full technical design including walkUpToComm algorithm, findClaudeTerminal cwd scoring, and platform matrix."}

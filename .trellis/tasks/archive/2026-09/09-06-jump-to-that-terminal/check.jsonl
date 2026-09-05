@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/liveness.md", "reason": "Verify walkUpToComm platform branches match the contract (both T and t covered; multi-word states; macOS ps -o comm=,ppid= style)."}
+{"file": ".trellis/spec/testing.md", "reason": "Verify new tests follow vitest + real child process pattern; ensure session file cleanup so vitest re-runs are stable."}
+{"file": ".trellis/spec/i18n.md", "reason": "Verify toast.terminal.notFound added in both zh.ts and en.ts with matching key names."}
+{"file": ".trellis/tasks/09-06-jump-to-that-terminal/prd.md", "reason": "Verify AC1-AC8 all addressable; especially AC3 (fallback toast wording) and AC6 (cross-platform matrix matches implementation)."}
+{"file": ".trellis/spec/architecture.md", "reason": "Verify new util files fit the architecture (no new module category, follows existing util/ pattern)."}
