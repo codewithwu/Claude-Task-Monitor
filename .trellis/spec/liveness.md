@@ -60,6 +60,16 @@ isProcessGone ─►│ process.platform │
               (+ ps fallback)
 ```
 
+### PID capture lives in `hook.sh`, not here
+
+`isProcessGone` only judges an *already-captured* PID; the work of finding the durable Claude Code CLI PID by walking up `$PPID` lives in `resources/hook.sh` and is platform-split:
+
+- **Linux / WSL**: read `/proc/<pid>/comm` and `/proc/<pid>/status` PPid field directly. Zero fork.
+- **macOS** (09-05 P0 #1): `ps -o comm=,ppid= -p <pid>` since `/proc` does not exist. macOS `ps` comm field is truncated to ~16 chars (`claude` fits); trailing whitespace is trimmed via `tr -d ' '`.
+- **Windows**: not applicable — Claude Code CLI runs under WSL2 on Windows, so the Linux branch applies.
+
+If the captured PID is the transient `sh` or `node MainThread` instead of `claude`, the 5s liveness tick will correctly identify it as gone — that's why hook.sh's lookup matters. See `resources/hook.sh` (`get_comm` / `get_ppid`) and the `bash -n` smoke tests in `src/test/hook.test.ts`.
+
 ### Linux / WSL guest — `checkViaProc` (`src/liveness.ts:34`)
 
 1. `process.kill(pid, 0)`:
@@ -210,6 +220,7 @@ The notifier test file uses `vi.useFakeTimers` to test dedup window timing (`not
 
 | File | Lines | Role |
 |------|-------|------|
+| `resources/hook.sh` | 11–55 | Walk up `$PPID` to capture the durable Claude Code CLI PID. Platform-split via `get_comm` / `get_ppid`: Linux reads `/proc`; macOS (09-05 P0 #1) uses `ps -o comm=,ppid=`. |
 | `src/liveness.ts` | 17–28 | Platform router entry |
 | `src/liveness.ts` | 34–58 | Linux `/proc` + `process.kill(0)` |
 | `src/liveness.ts` | 59–74 | `ps -o stat=` fallback (macOS / Linux fallback) |

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -150,4 +150,45 @@ describe('hook.sh SessionEnd 归档', () => {
 
     try { fs.unlinkSync(path.join(endedDir, archived[0])) } catch {}
   }, 10000)
+})
+
+// 09-05 P0 #1:hook.sh 抽 get_comm / get_ppid 函数,加了 macOS 分支。
+// CI 在 Linux 上跑 → 用 bash -n 静态语法 + Linux 分支 source smoke 覆盖;
+// Darwin 分支靠代码评审 + 用户在 Mac 上手工验证(本仓库无 macOS runner)。
+describe('hook.sh bash 语法校验 (P0 #1)', () => {
+  it('bash -n 通过 —— 任意平台都能跑', () => {
+    expect(() =>
+      execFileSync('bash', ['-n', HOOK_SCRIPT], { stdio: 'pipe' })
+    ).not.toThrow()
+  })
+
+  it('get_comm / get_ppid 可从 hook.sh source 出来并在 Linux 上能调', () => {
+    if (process.platform !== 'linux') return
+    // 抽出两个函数定义行 (^get_comm() ... ^}  与  ^get_ppid() ... ^})
+    const fnDefs = execFileSync(
+      'bash',
+      ['-c', 'sed -n \'/^get_comm()/,/^}$/p; /^get_ppid()/,/^}$/p\' "$1"', '_', HOOK_SCRIPT],
+      { encoding: 'utf8' }
+    )
+    expect(fnDefs).toContain('get_comm()')
+    expect(fnDefs).toContain('get_ppid()')
+
+    // 拼一段小程序:source 函数定义 → 调 get_comm 1 → 不抛
+    const out = execFileSync('bash', ['-c', `${fnDefs}\nget_comm 1 >/dev/null && echo OK`], {
+      encoding: 'utf8'
+    })
+    expect(out.trim()).toBe('OK')
+  })
+
+  it('Darwin 分支存在且调用 ps -o (静态检查)', () => {
+    // 不依赖运行平台:只 grep 文件内容,确保 Darwin 分支不会意外被删。
+    const src = fs.readFileSync(HOOK_SCRIPT, 'utf8')
+    expect(src).toMatch(/case "\$\(uname -s\)"/)
+    expect(src).toContain('Darwin)')
+    expect(src).toContain('ps -o comm=')
+    expect(src).toContain('ps -o ppid=')
+    // while 循环体改用 get_comm / get_ppid,不再直接 cat /proc
+    expect(src).not.toMatch(/comm=\$\(cat \/proc\//)
+    expect(src).not.toMatch(/awk '\/\\^PPid/)
+  })
 })
