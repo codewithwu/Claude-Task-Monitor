@@ -60,6 +60,12 @@ export const zh: Record<string, string> = {
   // ─── session noSelection warning ───
   'warn.noSelection': 'Claude Task Monitor：请先在侧边栏选中一个 session',
 
+  // ─── terminal jump toast (09-06 jump-to-that-terminal) ───
+  // 右键 / Command Palette「在终端中打开」时,如果现有 VS Code 集成终端里
+  // 没找到正在跑该 session 对应 Claude 进程的 tab,fallback 走新开 terminal +
+  // 弹一次性 toast 告知用户 —— 避免用户以为「聚焦」成功但其实开了一个新的。
+  'toast.terminal.notFound': '未找到正在运行该 claude 进程的集成终端，已在新终端中打开',
+
   // ─── jq install command (label only) ───
   'jqInstall.darwin': 'brew install jq',
   'jqInstall.linux': 'sudo apt install jq',

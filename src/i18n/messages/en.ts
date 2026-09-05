@@ -60,6 +60,13 @@ export const en: Record<string, string> = {
   // ─── session noSelection warning ───
   'warn.noSelection': 'Claude Task Monitor: please select a session in the sidebar first',
 
+  // ─── terminal jump toast (09-06 jump-to-that-terminal) ───
+  // Shown when "Open in Terminal" can't find an existing VS Code integrated
+  // terminal running the session's Claude process; we fall back to opening
+  // a new terminal + toast so the user knows their click was downgraded to
+  // "create new" instead of "focus existing".
+  'toast.terminal.notFound': 'No integrated terminal found running this Claude process — opened a new one instead.',
+
   // ─── jq install command (label only) ───
   'jqInstall.darwin': 'brew install jq',
   'jqInstall.linux': 'sudo apt install jq',

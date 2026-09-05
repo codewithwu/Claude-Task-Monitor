@@ -28,6 +28,7 @@ import { formatErrorMessage } from './util/formatError.js'
 import { LangToggle } from './ui/langToggle.js'
 import { projectName } from './util/pathNames.js'
 import { archiveFileName, ENDED_DIR_NAME } from './util/archiveName.js'
+import { findClaudeTerminal } from './util/findClaudeTerminal.js'
 
 const HOME_DIR = os.homedir()
 const ROOT_DIR = path.join(HOME_DIR, '.claude-task-monitor')
@@ -464,9 +465,28 @@ function fireSingle(sessions: ReadonlyArray<{ sessionId: string; toolName: strin
 }
 
 // 复用 terminal 创建逻辑 —— openInTerminal 命令菜单 + 后续 inline button 共用。
+//
+// 09-06 jump-to-that-terminal:先查现有 VS Code 集成终端里有没有在跑该 session
+// 对应 Claude 进程的 tab,有就 show() 聚焦;找不到才 fallback 创建新 terminal + 弹
+// 一次性 toast 告知用户。Q1=B 决议保持现有能力不丢 + 用户知情。
 function openClaudeTerminal(s: SessionState): void {
-  const term = vscode.window.createTerminal({ cwd: s.cwd, name: `claude: ${projectName(s.cwd)}` })
+  // fire-and-forget:命令菜单已经允许异步,Promise 丢给 registerCommand 即可
+  void openClaudeTerminalAsync(s)
+}
+
+async function openClaudeTerminalAsync(s: SessionState): Promise<void> {
+  const matched = await findClaudeTerminal(s)
+  if (matched) {
+    matched.show()
+    return
+  }
+  // Fallback —— 跟旧实现一致,只是多弹一个 toast
+  const term = vscode.window.createTerminal({
+    cwd: s.cwd,
+    name: `claude: ${projectName(s.cwd)}`
+  })
   term.show()
+  void vscode.window.showInformationMessage(t('toast.terminal.notFound'))
 }
 
 // 把 hook.sh 写到 ~/.claude-task-monitor/ 并把 hooks 块合并进 ~/.claude/settings.json。

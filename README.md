@@ -118,5 +118,5 @@ code --extensionDevelopmentPath=$(pwd)   # 调试
 ## 已知局限
 
 - 不监控远程/SSH 机器上的 CLI
-- 外部终端运行的 CLI 不能"聚焦到那个终端窗口"，只能开项目
+- VS Code 只能聚焦**本窗口内的集成终端**——外部终端（iTerm/Terminal.app/Windows Terminal）或跨 VS Code 窗口跑的 CLI 只能"打开项目"，不能精准跳到那个终端 tab
 - 没有历史/统计视图
