@@ -70,6 +70,29 @@ isProcessGone ─►│ process.platform │
 
 If the captured PID is the transient `sh` or `node MainThread` instead of `claude`, the 5s liveness tick will correctly identify it as gone — that's why hook.sh's lookup matters. See `resources/hook.sh` (`get_comm` / `get_ppid`) and the `bash -n` smoke tests in `src/test/hook.test.ts`.
 
+### Three PID modules, three distinct purposes (09-06)
+
+The repository has three independent process-introspection modules. They each answer a different question and **deliberately do not share code** (PRD Q3 of task `09-06-jump-to-that-terminal`). Future contributors: do not consolidate them without strong cause.
+
+| Module | Language | Purpose | Walks PPID? | Asks about state? |
+|--------|----------|---------|-------------|-------------------|
+| `resources/hook.sh` | bash | Capture the durable `claude` PID at event time and write it into the jsonl payload | yes (→ comm=claude) | no |
+| `src/liveness.ts` | TS | Judge whether an *already-captured* PID is dead, so `pruneDeadSessions` can remove stale entries | no | yes (T/t/Z/X) |
+| `src/util/pidAncestor.ts` | TS | Walk up from a shell PID (e.g., bash started by `term.createTerminal`) to find a target comm, used by `findClaudeTerminal` to focus the existing integrated terminal instead of opening a new one | yes (→ comm=claude) | no |
+
+**Why three copies of the same platform-router logic** (Linux `/proc`, Darwin `ps`, win32 → null):
+
+- `hook.sh` is **bash** and runs *inside* `claude`'s hook dispatch — there's no Node runtime to share with.
+- `liveness.ts` and `pidAncestor.ts` are both TS but ask opposite questions (state code vs comm string). Merging them would couple the dead-detection state-code contract (see [Cross-Platform Process State Contract](#cross-platform-process-state-contract-the-single-source-of-truth)) with the walking algorithm, doubling the risk that a fix to one regresses the other.
+- The TS pair reuses the same `/proc + ps` dispatch shape as a *convention*, not via import.
+
+**Cross-references**:
+- `src/util/pidAncestor.ts` — TS ancestor walker (max depth 8, single-fork 300 ms timeout).
+- `src/util/findClaudeTerminal.ts` — consumer that pairs `pidAncestor.walkUpToComm(pid, 'claude')` with `vscode.window.terminals` and a cwd-match score.
+- `src/test/pidAncestor.test.ts` and `src/test/findClaudeTerminal.test.ts` — fixtures follow `src/test/hook.test.ts`'s `setSelfComm` pattern.
+
+**Known limit** (PRD AC7, accepted at task time): `findClaudeTerminal` has per-terminal (200 ms) and per-fork (300 ms) timeouts but no *overall* race wrapper. Theoretically N terminals × 8 layers × 300 ms can exceed 1 s in pathological cases. Not observed in practice; tracked for a future iteration if any user hits it.
+
 ### Linux / WSL guest — `checkViaProc` (`src/liveness.ts:34`)
 
 1. `process.kill(pid, 0)`:
