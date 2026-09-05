@@ -1,0 +1,28 @@
+{
+  "id": "deactivate-uninstall-dialog",
+  "name": "deactivate-uninstall-dialog",
+  "title": "P0 #2 关窗口弹\"移除 hook\"对话框",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "cooper",
+  "assignee": "cooper",
+  "createdAt": "2026-09-05",
+  "completedAt": "2026-09-05",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "commit": "fcc4b1f"
+  }
+}
