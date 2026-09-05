@@ -1,0 +1,28 @@
+{
+  "id": "macos-session-disappear",
+  "name": "macos-session-disappear",
+  "title": "P0 #1 macOS 上 session 会自行消失",
+  "description": "hook.sh 的 PID 上溯循环只走 /proc, macOS 无 /proc 导致 effective_pid 退化为 transient PPID,5s 后被 pruneDeadSessions 误杀。需要在 hook.sh 加 macOS 分支用 ps -o ppid=,comm= 替代。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "cooper",
+  "assignee": "cooper",
+  "createdAt": "2026-09-05",
+  "completedAt": "2026-09-05",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "commit": "009be26"
+  }
+}
